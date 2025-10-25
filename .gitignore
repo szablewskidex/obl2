@@ -1,0 +1,10 @@
+# Folder ze starymi/niepotrzebnymi plikami
+smietnik/
+
+# Godot cache
+.godot/
+*.import
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang='en'>
+
+<head>
+	<meta charset='utf-8' />
+	<meta name='viewport' content='width=device-width, user-scalable=no' />
+	<title>bungvo</title>
+	<link rel="stylesheet" type="text/css" href="styles.css" />
+	<link id='-gd-engine-icon' rel='icon' type='image/png' href='index.icon.png' />
+	<link rel='apple-touch-icon' href='index.apple-touch-icon.png' />
+
+</head>
+
+<body>
+	<canvas id='canvas'>
+		HTML5 canvas appears to be unsupported in the current browser.<br />
+		Please try updating or use a different browser.
+	</canvas>
+	<div id='status'>
+		<div id='status-progress' class='hidden' oncontextmenu='event.preventDefault();'>
+			<div id='status-progress-inner'></div>
+		</div>
+		<div id='status-indeterminate' class='hidden' oncontextmenu='event.preventDefault();'>
+			<div></div>
+			<div></div>
+			<div></div>
+			<div></div>
+			<div></div>
+			<div></div>
+			<div></div>
+			<div></div>
+		</div>
+		<div id='status-notice' class='godot hidden'></div>
+	</div>
+
+	<script src='index.js'></script>
+	<script>
+		const GODOT_CONFIG = { "args": [], "canvasResizePolicy": 2, "executable": "index", "experimentalVK": false, "fileSizes": { "index.pck": 2203552, "index.wasm": 17860295 }, "focusCanvas": true, "gdnativeLibs": [] };
+		var engine = new Engine(GODOT_CONFIG);
+
+		(function () {
+			const INDETERMINATE_STATUS_STEP_MS = 100;
+			var statusProgress = document.getElementById('status-progress');
+			var statusProgressInner = document.getElementById('status-progress-inner');
+			var statusIndeterminate = document.getElementById('status-indeterminate');
+			var statusNotice = document.getElementById('status-notice');
+
+			var initializing = true;
+			var statusMode = 'hidden';
+
+			var animationCallbacks = [];
+			function animate(time) {
+				animationCallbacks.forEach(callback => callback(time));
+				requestAnimationFrame(animate);
+			}
+			requestAnimationFrame(animate);
+
+			function setStatusMode(mode) {
+
+				if (statusMode === mode || !initializing)
+					return;
+				[statusProgress, statusIndeterminate, statusNotice].forEach(elem => {
+					elem.classList.add('hidden');
+				});
+				animationCallbacks = animationCallbacks.filter(function (value) {
+					return (value !== animateStatusIndeterminate);
+				});
+				switch (mode) {
+					case 'progress':
+						statusProgress.classList.remove('hidden');
+						break;
+					case 'indeterminate':
+						statusIndeterminate.classList.remove('hidden');
+						animationCallbacks.push(animateStatusIndeterminate);
+						break;
+					case 'notice':
+						statusNotice.classList.remove('hidden');
+						break;
+					case 'hidden':
+						break;
+					default:
+						throw new Error('Invalid status mode');
+				}
+				statusMode = mode;
+			}
+
+			function animateStatusIndeterminate(ms) {
+				var i = Math.floor(ms / INDETERMINATE_STATUS_STEP_MS % 8);
+				if (statusIndeterminate.children[i].style.borderTopColor === '') {
+					Array.prototype.slice.call(statusIndeterminate.children).forEach(child => {
+						child.style.borderTopColor = '';
+					});
+					statusIndeterminate.children[i].style.borderTopColor = 'var(--spinner-active-color)';
+				}
+			}
+
+			function setStatusNotice(text) {
+				while (statusNotice.lastChild) {
+					statusNotice.removeChild(statusNotice.lastChild);
+				}
+				var lines = text.split('\n');
+				lines.forEach((line) => {
+					statusNotice.appendChild(document.createTextNode(line));
+					statusNotice.appendChild(document.createElement('br'));
+				});
+			};
+
+			function displayFailureNotice(err) {
+				var msg = err.message || err;
+				console.error(msg);
+				setStatusNotice(msg);
+				setStatusMode('notice');
+				initializing = false;
+			};
+
+			// Resource validation functions
+			function validateResourceExists(url) {
+				return fetch(url, { method: 'HEAD' })
+					.then(response => {
+						if (!response.ok) {
+							throw new Error(`Resource not found: ${url} (${response.status})`);
+						}
+						return true;
+					})
+					.catch(error => {
+						// Handle network errors and CORS issues
+						if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+							throw new Error(`Network error loading ${url}. Please check your internet connection or server configuration.`);
+						}
+						throw error;
+					});
+			}
+
+			function validateGameResources() {
+				const requiredResources = [
+					{ file: 'index.wasm', description: 'WebAssembly game engine' },
+					{ file: 'index.pck', description: 'Game data package' }
+				];
+
+				setStatusMode('indeterminate');
+
+				const validationPromises = requiredResources.map(resource =>
+					validateResourceExists(resource.file)
+						.catch(error => {
+							throw new Error(`Failed to load ${resource.description} (${resource.file}):\n${error.message}`);
+						})
+				);
+
+				return Promise.all(validationPromises);
+			}
+
+			function startGameWithValidation() {
+				return validateGameResources()
+					.then(() => {
+						// Resources validated, proceed with game loading
+						return engine.startGame({
+							'onProgress': function (current, total) {
+								if (total > 0) {
+									statusProgressInner.style.width = current / total * 100 + '%';
+									setStatusMode('progress');
+									if (current === total) {
+										// wait for progress bar animation
+										setTimeout(() => {
+											setStatusMode('indeterminate');
+										}, 500);
+									}
+								} else {
+									setStatusMode('indeterminate');
+								}
+							},
+						});
+					})
+					.then(() => {
+						setStatusMode('hidden');
+						initializing = false;
+					})
+					.catch(error => {
+						// Enhanced error messages for common issues
+						let errorMessage = error.message || error;
+
+						if (errorMessage.includes('index.wasm')) {
+							errorMessage += '\n\nThis usually means:\n• The WebAssembly file is missing from the server\n• There\'s a network connectivity issue\n• The server is not configured to serve .wasm files';
+						} else if (errorMessage.includes('index.pck')) {
+							errorMessage += '\n\nThis usually means:\n• The game data file is missing from the server\n• There\'s a network connectivity issue\n• The file was not uploaded correctly';
+						} else if (errorMessage.includes('Network error')) {
+							errorMessage += '\n\nPlease try:\n• Refreshing the page\n• Checking your internet connection\n• Contacting the site administrator if the problem persists';
+						}
+
+						displayFailureNotice(errorMessage);
+					});
+			}
+
+			if (!Engine.isWebGLAvailable()) {
+				displayFailureNotice('WebGL not available');
+			} else {
+				startGameWithValidation();
+			}
+		})();
+	</script>
+</body>
+
+</html>
