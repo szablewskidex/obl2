@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animation Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+            display: flex;
+            gap: 20px;
+        }
+        
+        #canvasContainer {
+            background: #1a1a2e;
+            border: 2px solid #333;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        #gameCanvas {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 5px;
+        }
+        
+        #controls {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            min-width: 350px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .control-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .control-group h3 {
+            margin: 0 0 15px 0;
+            color: #333;
+        }
+        
+        .slider-container {
+            margin-bottom: 10px;
+        }
+        
+        .slider-container label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .slider-container input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        
+        .slider-value {
+            font-size: 12px;
+            color: #666;
+            text-align: right;
+        }
+        
+        .preset-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .preset-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .preset-btn:hover {
+            background: #218838;
+        }
+        
+        .export-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            width: 100%;
+            margin-top: 20px;
+        }
+        
+        .export-btn:hover {
+            background: #c82333;
+        }
+        
+        .code-output {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvasContainer">
+        <canvas id="gameCanvas" width="400" height="300"></canvas>
+    </div>
+    
+    <div id="controls">
+        <h2>🎭 Animation Tester</h2>
+        <p>Dostosuj pozycje części ciała za pomocą sliderów</p>
+        
+        <div class="preset-buttons">
+            <button class="preset-btn" onclick="loadPreset('idle')">Idle</button>
+            <button class="preset-btn" onclick="loadPreset('jump')">Jump</button>
+            <button class="preset-btn" onclick="loadPreset('ball')">Ball</button>
+            <button class="preset-btn" onclick="resetAll()">Reset</button>
+        </div>
+        
+        <div class="control-group">
+            <h3>📝 Nazwa animacji</h3>
+            <input type="text" id="animationName" placeholder="np. idle, jump, frontflip" value="custom" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+        
+        <div class="control-group">
+            <h3>👤 Głowa</h3>
+            <div class="slider-container">
+                <label>Offset X:</label>
+                <input type="range" id="headOffsetX" min="-30" max="30" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="headOffsetX-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Offset Y:</label>
+                <input type="range" id="headOffsetY" min="-50" max="20" value="-25" oninput="updateAnimation()">
+                <div class="slider-value" id="headOffsetY-value">-25</div>
+            </div>
+            <div class="slider-container">
+                <label>Rotation:</label>
+                <input type="range" id="headRotation" min="-1.5" max="1.5" step="0.1" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="headRotation-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Scale:</label>
+                <input type="range" id="headScale" min="0.3" max="1.5" step="0.1" value="1.0" oninput="updateAnimation()">
+                <div class="slider-value" id="headScale-value">1.0</div>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <h3>🎽 Tors</h3>
+            <div class="slider-container">
+                <label>Offset X:</label>
+                <input type="range" id="bodyOffsetX" min="-30" max="30" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="bodyOffsetX-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Offset Y:</label>
+                <input type="range" id="bodyOffsetY" min="-30" max="30" value="-9" oninput="updateAnimation()">
+                <div class="slider-value" id="bodyOffsetY-value">-9</div>
+            </div>
+            <div class="slider-container">
+                <label>Rotation:</label>
+                <input type="range" id="bodyRotation" min="-1.5" max="1.5" step="0.1" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="bodyRotation-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Scale:</label>
+                <input type="range" id="bodyScale" min="0.3" max="1.5" step="0.1" value="1.0" oninput="updateAnimation()">
+                <div class="slider-value" id="bodyScale-value">1.0</div>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <h3>🦵 Nogi</h3>
+            <div class="slider-container">
+                <label>Left Leg X:</label>
+                <input type="range" id="leftLegX" min="-20" max="20" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="leftLegX-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Right Leg X:</label>
+                <input type="range" id="rightLegX" min="-20" max="20" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="rightLegX-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Thigh Bend Y:</label>
+                <input type="range" id="thighBendY" min="-50" max="10" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="thighBendY-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Shin Bend Y:</label>
+                <input type="range" id="shinBendY" min="-60" max="10" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="shinBendY-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Shin Bend X:</label>
+                <input type="range" id="shinBendX" min="-30" max="10" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="shinBendX-value">0</div>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <h3>👟 Buty</h3>
+            <div class="slider-container">
+                <label>Shoe Bend Y:</label>
+                <input type="range" id="shoeBendY" min="-70" max="10" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="shoeBendY-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Shoe Bend X:</label>
+                <input type="range" id="shoeBendX" min="-40" max="10" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="shoeBendX-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Shoe Rotation:</label>
+                <input type="range" id="shoeRotation" min="-1.5" max="1.5" step="0.1" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="shoeRotation-value">0</div>
+            </div>
+        </div>
+        
+        <button class="export-btn" onclick="exportAnimation()">📋 Eksportuj kod animacji</button>
+        
+        <div id="codeOutput"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Load character atlas
+        const characterAtlas = new Image();
+        let imageLoaded = false;
+        characterAtlas.onload = function() {
+            imageLoaded = true;
+            updateAnimation();
+        };
+        characterAtlas.src = 'assets/charatlas.png';
+        
+        // Player dimensions
+        const playerWidth = 60;
+        const playerHeight = 140;
+        const playerX = canvas.width / 2 - playerWidth / 2;
+        const playerY = canvas.height / 2 - playerHeight / 2;
+        
+        function updateSliderValue(id) {
+            const slider = document.getElementById(id);
+            const valueDiv = document.getElementById(id + '-value');
+            valueDiv.textContent = slider.value;
+        }
+        
+        function updateAnimation() {
+            // Update all slider values
+            ['headOffsetX', 'headOffsetY', 'headRotation', 'headScale', 'bodyOffsetX', 'bodyOffsetY', 'bodyRotation', 'bodyScale', 'leftLegX', 'rightLegX', 
+             'thighBendY', 'shinBendY', 'shinBendX', 'shoeBendY', 'shoeBendX', 'shoeRotation'].forEach(updateSliderValue);
+            
+            if (!imageLoaded) return;
+            
+            // Clear canvas
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Get values from sliders
+            const headOffsetX = parseFloat(document.getElementById('headOffsetX').value);
+            const headOffsetY = parseFloat(document.getElementById('headOffsetY').value);
+            const headRotation = parseFloat(document.getElementById('headRotation').value);
+            const headScale = parseFloat(document.getElementById('headScale').value);
+            const bodyOffsetX = parseFloat(document.getElementById('bodyOffsetX').value);
+            const bodyOffsetY = parseFloat(document.getElementById('bodyOffsetY').value);
+            const bodyRotation = parseFloat(document.getElementById('bodyRotation').value);
+            const bodyScale = parseFloat(document.getElementById('bodyScale').value);
+            const leftLegX = parseFloat(document.getElementById('leftLegX').value);
+            const rightLegX = parseFloat(document.getElementById('rightLegX').value);
+            const thighBendY = parseFloat(document.getElementById('thighBendY').value);
+            const shinBendY = parseFloat(document.getElementById('shinBendY').value);
+            const shinBendX = parseFloat(document.getElementById('shinBendX').value);
+            const shoeBendY = parseFloat(document.getElementById('shoeBendY').value);
+            const shoeBendX = parseFloat(document.getElementById('shoeBendX').value);
+            const shoeRotation = parseFloat(document.getElementById('shoeRotation').value);
+            
+            // Draw character parts
+            drawCharacter(playerX, playerY, {
+                headOffsetX, headOffsetY, headRotation, headScale, 
+                bodyOffsetX, bodyOffsetY, bodyRotation, bodyScale,
+                leftLegX, rightLegX, thighBendY, shinBendY, shinBendX,
+                shoeBendY, shoeBendX, shoeRotation
+            });
+        }
+        
+        function drawCharacter(x, y, params) {
+            ctx.save();
+            
+            // Draw head with rotation
+            if (params.headRotation !== 0) {
+                ctx.save();
+                const headX = x - playerWidth * 0.2 + params.headOffsetX;
+                const headY = y + params.headOffsetY;
+                const headW = playerWidth * 1.4 * params.headScale;
+                const headH = playerHeight * 0.35 * params.headScale;
+                ctx.translate(headX + headW/2, headY + headH/2);
+                ctx.rotate(params.headRotation);
+                ctx.drawImage(
+                    characterAtlas,
+                    20, 7, 154, 126,
+                    -headW/2, -headH/2, headW, headH
+                );
+                ctx.restore();
+            } else {
+                ctx.drawImage(
+                    characterAtlas,
+                    20, 7, 154, 126,
+                    x - playerWidth * 0.2 + params.headOffsetX, y + params.headOffsetY,
+                    playerWidth * 1.4 * params.headScale, playerHeight * 0.35 * params.headScale
+                );
+            }
+            
+            // Draw torso with rotation
+            if (params.bodyRotation !== 0) {
+                ctx.save();
+                const bodyX = x + playerWidth * 0.1 + params.bodyOffsetX;
+                const bodyY = y + params.bodyOffsetY;
+                const bodyW = playerWidth * 0.8 * params.bodyScale;
+                const bodyH = playerHeight * 0.4 * params.bodyScale;
+                ctx.translate(bodyX + bodyW/2, bodyY + bodyH/2);
+                ctx.rotate(params.bodyRotation);
+                ctx.drawImage(
+                    characterAtlas,
+                    6, 137, 165, 124,
+                    -bodyW/2, -bodyH/2, bodyW, bodyH
+                );
+                ctx.restore();
+            } else {
+                ctx.drawImage(
+                    characterAtlas,
+                    6, 137, 165, 124,
+                    x + playerWidth * 0.1 + params.bodyOffsetX, y + params.bodyOffsetY,
+                    playerWidth * 0.8 * params.bodyScale, playerHeight * 0.4 * params.bodyScale
+                );
+            }
+            
+            // Leg dimensions
+            const legStartY = y + playerHeight * 0.25;
+            const legWidth = playerWidth * 0.35;
+            const legHeight = playerHeight * 0.8;
+            
+            // Left thigh
+            ctx.drawImage(
+                characterAtlas,
+                50, 263, 40, 92,
+                x + playerWidth * 0.15 + params.leftLegX, legStartY + params.thighBendY,
+                legWidth, legHeight * 0.3
+            );
+            
+            // Left shin
+            ctx.drawImage(
+                characterAtlas,
+                43, 355, 53, 70,
+                x + playerWidth * 0.15 + params.leftLegX + params.shinBendX, legStartY + legHeight * 0.3 + params.shinBendY,
+                legWidth, legHeight * 0.3
+            );
+            
+            // Left shoe
+            if (params.shoeRotation !== 0) {
+                ctx.save();
+                const shoeX = x + playerWidth * 0.1 + params.leftLegX + params.shoeBendX;
+                const shoeY = legStartY + legHeight * 0.5 + params.shoeBendY;
+                ctx.translate(shoeX + legWidth * 0.6, shoeY + legHeight * 0.1);
+                ctx.rotate(params.shoeRotation);
+                ctx.drawImage(
+                    characterAtlas,
+                    31, 442, 62, 68,
+                    -legWidth * 0.6, -legHeight * 0.1,
+                    legWidth * 1.2, legHeight * 0.2
+                );
+                ctx.restore();
+            } else {
+                ctx.drawImage(
+                    characterAtlas,
+                    31, 442, 62, 68,
+                    x + playerWidth * 0.1 + params.leftLegX + params.shoeBendX, legStartY + legHeight * 0.5 + params.shoeBendY,
+                    legWidth * 1.2, legHeight * 0.2
+                );
+            }
+            
+            // Right thigh
+            ctx.drawImage(
+                characterAtlas,
+                93, 261, 47, 97,
+                x + playerWidth * 0.5 + params.rightLegX, legStartY + params.thighBendY,
+                legWidth, legHeight * 0.3
+            );
+            
+            // Right shin
+            ctx.drawImage(
+                characterAtlas,
+                100, 361, 44, 64,
+                x + playerWidth * 0.5 + params.rightLegX + params.shinBendX, legStartY + legHeight * 0.3 + params.shinBendY,
+                legWidth, legHeight * 0.3
+            );
+            
+            // Right shoe
+            if (params.shoeRotation !== 0) {
+                ctx.save();
+                const shoeX = x + playerWidth * 0.45 + params.rightLegX + params.shoeBendX;
+                const shoeY = legStartY + legHeight * 0.5 + params.shoeBendY;
+                ctx.translate(shoeX + legWidth * 0.6, shoeY + legHeight * 0.1);
+                ctx.rotate(params.shoeRotation);
+                ctx.drawImage(
+                    characterAtlas,
+                    97, 446, 83, 57,
+                    -legWidth * 0.6, -legHeight * 0.1,
+                    legWidth * 1.2, legHeight * 0.2
+                );
+                ctx.restore();
+            } else {
+                ctx.drawImage(
+                    characterAtlas,
+                    97, 446, 83, 57,
+                    x + playerWidth * 0.45 + params.rightLegX + params.shoeBendX, legStartY + legHeight * 0.5 + params.shoeBendY,
+                    legWidth * 1.2, legHeight * 0.2
+                );
+            }
+            
+            ctx.restore();
+        }
+        
+        function loadPreset(preset) {
+            const presets = {
+                idle: {
+                    headOffsetX: 0, headOffsetY: -25, headRotation: 0, headScale: 1.0, 
+                    bodyOffsetX: 0, bodyOffsetY: -9, bodyRotation: 0, bodyScale: 1.0,
+                    leftLegX: 0, rightLegX: 0, thighBendY: 0, shinBendY: 0, shinBendX: 0,
+                    shoeBendY: 0, shoeBendX: 0, shoeRotation: 0
+                },
+                jump: {
+                    headOffsetX: 0, headOffsetY: -30, headRotation: 0, headScale: 1.0, 
+                    bodyOffsetX: 0, bodyOffsetY: -14, bodyRotation: 0, bodyScale: 1.0,
+                    leftLegX: -2, rightLegX: 2, thighBendY: -10, shinBendY: -25, shinBendX: -8,
+                    shoeBendY: -30, shoeBendX: -20, shoeRotation: 0.8
+                },
+                ball: {
+                    headOffsetX: 0, headOffsetY: -15, headRotation: 0, headScale: 0.8, 
+                    bodyOffsetX: 0, bodyOffsetY: -3, bodyRotation: 0, bodyScale: 0.7,
+                    leftLegX: 8, rightLegX: -8, thighBendY: -35, shinBendY: -45, shinBendX: -15,
+                    shoeBendY: -50, shoeBendX: -25, shoeRotation: 1.2
+                }
+            };
+            
+            const values = presets[preset];
+            if (values) {
+                Object.keys(values).forEach(key => {
+                    const slider = document.getElementById(key);
+                    if (slider) {
+                        slider.value = values[key];
+                    }
+                });
+                updateAnimation();
+            }
+        }
+        
+        function resetAll() {
+            loadPreset('idle');
+        }
+        
+        function exportAnimation() {
+            const animationName = document.getElementById('animationName').value || 'custom';
+            const values = {};
+            ['headOffsetX', 'headOffsetY', 'headRotation', 'headScale', 'bodyOffsetX', 'bodyOffsetY', 'bodyRotation', 'bodyScale', 'leftLegX', 'rightLegX', 
+             'thighBendY', 'shinBendY', 'shinBendX', 'shoeBendY', 'shoeBendX', 'shoeRotation'].forEach(id => {
+                values[id] = parseFloat(document.getElementById(id).value);
+            });
+            
+            const code = `// Animacja "${animationName}" wygenerowana z Animation Tester
+} else if (this.animationState === '${animationName}') {
+    // ${animationName} animation - custom animation from tester
+    headOffsetX = ${values.headOffsetX};
+    bodyBob = ${values.headOffsetY};       // headOffsetY jako bodyBob dla głowy
+    headRotation = ${values.headRotation};
+    bodyOffsetX = ${values.bodyOffsetX};
+    bodyBob = ${values.bodyOffsetY};       // bodyOffsetY
+    bodyRotation = ${values.bodyRotation};
+    leftLegX = ${values.leftLegX};
+    rightLegX = ${values.rightLegX};
+    thighBendY = ${values.thighBendY};
+    shinBendY = ${values.shinBendY};
+    shinBendX = ${values.shinBendX};
+    shoeBendY = ${values.shoeBendY};
+    shoeBendX = ${values.shoeBendX};
+    shoeRotation = ${values.shoeRotation};`;
+            
+            document.getElementById('codeOutput').innerHTML = `<div class="code-output">${code}</div>`;
+        }
+        
+        // Initialize
+        updateAnimation();
+    </script>
+</body>
+</html>

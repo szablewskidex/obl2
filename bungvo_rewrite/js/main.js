@@ -21,6 +21,8 @@ class BungvoGame {
         
         // Input handling
         this.keys = {};
+        this.gamepadManager = new GamepadManager();
+        this.fullscreenManager = new FullscreenManager();
         this.setupInput();
         
         // Game loop
@@ -75,8 +77,16 @@ class BungvoGame {
     update(deltaTime) {
         if (this.gameState !== 'playing') return;
         
+        // Update gamepad
+        this.gamepadManager.update();
+        
+        // Combine keyboard and gamepad inputs
+        const combinedKeys = { ...this.keys };
+        const gamepadKeys = this.gamepadManager.getVirtualKeys();
+        Object.assign(combinedKeys, gamepadKeys);
+        
         // Update player and get walking state
-        const playerState = this.player.update(deltaTime, this.keys, this.world);
+        const playerState = this.player.update(deltaTime, combinedKeys, this.world);
         
         // Update independent clouds
         this.updateIndependentClouds(deltaTime);
@@ -248,7 +258,7 @@ class BungvoGame {
         
         // Position player in center
         this.player.x = this.canvas.width * 0.5; // Center of screen
-        this.player.y = this.canvas.height - 80; // Lower so legs are visible on sidewalk
+        this.player.y = this.canvas.height - 20 - this.player.height; // Stopy dokładnie na chodnik
         
         // Initialize independent clouds system
         this.initIndependentClouds();
