@@ -6,11 +6,15 @@ class World {
         
         // Infinite runner - no static platforms, everything scrolls
         this.coins = [];
-        this.obstacles = [];
+        this.obstacles = []; // Legacy - now using ObstacleManager
+        
+        // Initialize obstacle manager
+        this.obstacleManager = null; // Will be initialized after loading obstacles.js
         
         // Parallax scrolling system
         this.scrollSpeed = 250; // Base scroll speed - matches player speed
         this.currentScrollDirection = 0; // Smooth scroll direction
+        this.totalScrollDistance = 0; // Track total scroll distance (can't go negative)
         this.parallaxLayers = [];
         
         // Load original textures
@@ -28,8 +32,9 @@ class World {
             'oblockmid.png',      // Platform texture
             'platform.png',       // Platform texture
             'download.png',       // Background element
-            'oblck.png',          // Block texture
-            'id2.png'             // Coin/collectible texture
+            'moneta.png',         // Coin texture (renamed from oblck.png)
+            'obstacle1.png',      // Tall block texture for obstacles (renamed from oblckclck.png)
+            'police_car.png'      // Police car obstacle (can jump on)
         ];
         
         this.texturesLoaded = 0;
@@ -65,7 +70,7 @@ class World {
                 name: 'red_buildings',
                 texture: 'download',  // Red brick buildings in background - CORRECTED
                 speed: 0.4,  // Background speed
-                y: this.height * -0.35,  // Opuszczone o 30% (-65% + 30% = -35%)
+                y: this.height * 0.05,  // Przesunięte w dół
                 scale: 1.8,  // Zmniejszone o 0.2 (2.0 - 0.2 = 1.8)
                 mirroring: 900,
                 renderType: 'texture'  // Use texture rendering - NO CLIPPING
@@ -74,7 +79,7 @@ class World {
                 name: 'green_trees',
                 texture: 'oblockmid',  // Green trees/bushes behind fence - CORRECTED
                 speed: 0.7,  // Closer to foreground
-                y: this.height * -0.11,  // Opuszczone o 2% (-13% + 2% = -11%) - idealna pozycja
+                y: this.height * 0.25,  // Przesunięte w dół
                 scale: 1.5,  // Przywrócona rozsądna skala
                 mirroring: 912,
                 renderType: 'texture'  // Use texture rendering - NO HEIGHT LIMITS, NO CLIPPING
@@ -83,7 +88,7 @@ class World {
                 name: 'fence_and_sidewalk',
                 texture: 'oblockfence',  // Black fence with green bushes + gray sidewalk
                 speed: 1.0,  // Full speed - foreground
-                y: this.height * 0.3,  // Znacznie wyżej żeby szary chodnik był widoczny
+                y: this.height * 0.50,  // Wyżej - chodnik w dolnej połowie ekranu
                 scale: 1.8,  // Smaller scale for testing
                 mirroring: 1000,
                 renderType: 'texture'
@@ -113,6 +118,17 @@ class World {
         }
         
         console.log(`Infinite runner setup: ${this.parallaxLayers.length} parallax layers, ${this.coins.length} scrolling coins`);
+        
+        // Initialize obstacle manager after a short delay to ensure ObstacleManager is loaded
+        setTimeout(() => {
+            if (typeof ObstacleManager !== 'undefined') {
+                this.obstacleManager = new ObstacleManager(this.height);
+                console.log('Obstacle manager initialized');
+                
+                // Generate some initial obstacles for testing
+                this.generateInitialObstacles();
+            }
+        }, 100);
     }
     
     addPlatform(x, y, width, height) {
@@ -149,6 +165,11 @@ class World {
     }
     
     update(deltaTime, playerState, playerX) {
+        // Update obstacle manager ground level if height changed
+        if (this.obstacleManager && this.obstacleManager.worldHeight !== this.height) {
+            this.obstacleManager.updateGroundY(this.height);
+        }
+        
         // Clouds are now handled in main.js - no longer part of world
         
         // Smooth scroll direction transition
@@ -168,11 +189,21 @@ class World {
         if (playerState.isWalking && playerState.walkDirection !== 0) {
             // Player is moving - follow their direction
             targetDirection = playerState.walkDirection;
+            
+            // Don't scroll left if player is at left edge
+            if (targetDirection < 0 && playerX <= 0) {
+                targetDirection = 0;
+            }
         } else {
             // Player stopped - auto-center camera
             if (Math.abs(distanceFromCenter) > centerThreshold) {
                 // Slowly scroll to center player
                 targetDirection = distanceFromCenter > 0 ? 0.3 : -0.3; // Slow centering
+                
+                // Don't scroll left if player is at left edge
+                if (targetDirection < 0 && playerX <= 0) {
+                    targetDirection = 0;
+                }
             }
         }
         
@@ -189,6 +220,20 @@ class World {
             const speedMultiplier = playerState.isDashing ? 2.0 : 1.0;
             const actualScrollSpeed = this.scrollSpeed * speedMultiplier;
             scrollDistance = actualScrollSpeed * deltaTime * this.currentScrollDirection;
+            
+            // Check if trying to scroll left (backwards) beyond start
+            if (this.currentScrollDirection < 0) {
+                // Scrolling left (backwards)
+                const newTotalScroll = this.totalScrollDistance + scrollDistance;
+                if (newTotalScroll < 0) {
+                    // Hit the left boundary - clamp to 0
+                    scrollDistance = -this.totalScrollDistance;
+                    this.currentScrollDirection = 0; // Stop scrolling
+                }
+            }
+            
+            // Update total scroll distance
+            this.totalScrollDistance += scrollDistance;
             
             // Update parallax scrolling with smooth direction (completely exclude clouds)
             this.parallaxLayers.forEach(layer => {
@@ -254,6 +299,14 @@ class World {
                     });
                 }
             }
+            
+        }
+        
+        // Update obstacles (always, with current scroll speed)
+        if (this.obstacleManager) {
+            const speedMultiplier = playerState.isDashing ? 2.0 : 1.0;
+            const currentScrollSpeed = this.scrollSpeed * speedMultiplier;
+            this.obstacleManager.update(deltaTime, currentScrollSpeed, this.currentScrollDirection, this.width);
         }
         
         // Always rotate coins (even when not walking)
@@ -271,6 +324,11 @@ class World {
         this.renderParallaxLayers(ctx);
         // Clouds are now rendered in main.js context, not world context
         this.renderScrollingCoins(ctx);
+        
+        // Render obstacles
+        if (this.obstacleManager) {
+            this.obstacleManager.render(ctx, this.textures);
+        }
     }
     
     renderParallaxLayers(ctx) {
@@ -387,11 +445,11 @@ class World {
             // Rotate coin for spinning effect
             ctx.rotate((coin.rotation || 0) * Math.PI / 180);
             
-            // Use original coin texture if available
-            if (this.textures.oblck && this.textures.oblck.complete) {
-                // Draw the coin texture
+            // Use moneta texture for coins
+            if (this.textures.moneta && this.textures.moneta.complete) {
+                // Draw the coin texture from moneta.png
                 ctx.drawImage(
-                    this.textures.oblck,
+                    this.textures.moneta,
                     -coin.width / 2, -coin.height / 2,
                     coin.width, coin.height
                 );
@@ -435,5 +493,50 @@ class World {
     
     getCoins() {
         return this.coins.filter(coin => !coin.collected);
+    }
+    
+    generateInitialObstacles() {
+        if (!this.obstacleManager) return;
+        
+        // Generate fewer obstacles, further away from player
+        const obstacleTypes = ['block', 'fence', 'platform']; // Remove tall_block from initial spawn
+        const groundY = this.height - 20;
+        
+        // Only spawn 3 obstacles initially, far ahead
+        const numObstacles = 3;
+        for (let i = 0; i < numObstacles; i++) {
+            const x = 800 + i * 500; // Start 800px ahead, space 500px apart
+            const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+            
+            // Create obstacle
+            const obstacle = new Obstacle(x, groundY - 40, type);
+            
+            // Adjust Y position for different obstacle types
+            if (type === 'platform') {
+                obstacle.y = groundY - 60;
+            } else if (type === 'tall_block') {
+                obstacle.y = groundY - 80;
+            }
+            
+            this.obstacleManager.obstacles.push(obstacle);
+        }
+        
+        console.log(`Generated ${this.obstacleManager.obstacles.length} initial obstacles`);
+    }
+    
+    // Check collisions with obstacles
+    checkObstacleCollisions(player) {
+        if (this.obstacleManager) {
+            return this.obstacleManager.checkCollisions(player);
+        }
+        return [];
+    }
+    
+    // Get active obstacles for other systems
+    getActiveObstacles() {
+        if (this.obstacleManager) {
+            return this.obstacleManager.getActiveObstacles();
+        }
+        return [];
     }
 }

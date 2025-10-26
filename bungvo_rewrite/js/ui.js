@@ -274,4 +274,88 @@ class UI {
             ctx.restore();
         }
     }
+    
+    // Weapon UI
+    renderWeaponUI(ctx, weaponSystem) {
+        const margin = 20;
+        const uiX = ctx.canvas.width - 200 - margin;
+        const uiY = margin;
+        
+        ctx.save();
+        
+        // Ammo counter background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(uiX, uiY, 200, 80);
+        
+        // Border
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(uiX, uiY, 200, 80);
+        
+        // Ammo text
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'left';
+        
+        if (weaponSystem.isCurrentlyReloading()) {
+            // Show reload progress
+            ctx.fillText('RELOADING...', uiX + 10, uiY + 30);
+            
+            // Reload progress bar
+            const reloadProgress = weaponSystem.getReloadPercent();
+            this.renderProgressBar(ctx, uiX + 10, uiY + 40, 180, 15, reloadProgress, '#ff6b6b');
+            
+            // Reload percentage
+            ctx.font = '14px Arial';
+            ctx.fillText(Math.round(reloadProgress * 100) + '%', uiX + 10, uiY + 70);
+        } else {
+            // Show ammo count
+            const ammoText = `${weaponSystem.getCurrentAmmo()}/${weaponSystem.getMaxAmmo()}`;
+            ctx.fillText('AMMO:', uiX + 10, uiY + 25);
+            ctx.fillText(ammoText, uiX + 10, uiY + 50);
+            
+            // Ammo bar
+            const ammoProgress = weaponSystem.getAmmoPercent();
+            let ammoColor = '#4ecdc4';
+            if (ammoProgress < 0.3) ammoColor = '#ff6b6b';
+            else if (ammoProgress < 0.6) ammoColor = '#ffeb3b';
+            
+            this.renderProgressBar(ctx, uiX + 10, uiY + 55, 180, 10, ammoProgress, ammoColor);
+        }
+        
+        // Controls hint
+        ctx.font = '12px Arial';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.textAlign = 'right';
+        ctx.fillText('X/Z/SPACE: Shoot | R: Reload', ctx.canvas.width - margin, ctx.canvas.height - margin);
+        
+        ctx.restore();
+    }
+    
+    // Crosshair
+    renderCrosshair(ctx, player) {
+        const centerX = player.x + player.width / 2 + (50 * player.facingDirection);
+        const centerY = player.y + player.height / 2 - 10;
+        
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.lineWidth = 2;
+        
+        // Cross lines
+        const size = 10;
+        ctx.beginPath();
+        ctx.moveTo(centerX - size, centerY);
+        ctx.lineTo(centerX + size, centerY);
+        ctx.moveTo(centerX, centerY - size);
+        ctx.lineTo(centerX, centerY + size);
+        ctx.stroke();
+        
+        // Center dot
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    }
 }

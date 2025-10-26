@@ -10,6 +10,7 @@ class BungvoGame {
         this.world = null;
         this.ui = null;
         this.physics = null;
+        this.weaponSystem = null;
         
         // Game stats
         this.score = 0;
@@ -39,6 +40,7 @@ class BungvoGame {
         this.world = new World(this.canvas.width, this.canvas.height);
         this.player = new Player(100, 400, this.physics);
         this.ui = new UI();
+        this.weaponSystem = new WeaponSystem();
         
         // Count total coins
         this.totalCoins = this.world.coins.length;
@@ -70,6 +72,31 @@ class BungvoGame {
             this.keys[e.code] = false;
         });
         
+        // Mouse input for shooting and aiming
+        this.mouseY = 0;
+        this.lastMouseY = 0;
+        this.mouseDeltaY = 0;
+        
+        this.canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 0) { // Left mouse button
+                this.keys['MouseLeft'] = true;
+            }
+            e.preventDefault();
+        });
+        
+        this.canvas.addEventListener('mouseup', (e) => {
+            if (e.button === 0) { // Left mouse button
+                this.keys['MouseLeft'] = false;
+            }
+        });
+        
+        this.canvas.addEventListener('mousemove', (e) => {
+            const rect = this.canvas.getBoundingClientRect();
+            this.mouseY = e.clientY - rect.top;
+            this.mouseDeltaY = this.mouseY - this.lastMouseY;
+            this.lastMouseY = this.mouseY;
+        });
+        
         // Prevent context menu on right click
         this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     }
@@ -87,6 +114,19 @@ class BungvoGame {
         
         // Update player and get walking state
         const playerState = this.player.update(deltaTime, combinedKeys, this.world);
+        
+        // Update weapon system
+        if (this.weaponSystem) {
+            // Pass mouse and gamepad data for aiming
+            const aimInput = {
+                mouseDeltaY: this.mouseDeltaY || 0,
+                gamepadLeftStickY: this.gamepadManager.getAxisValue(this.gamepadManager.axes.LEFT_STICK_Y) || 0
+            };
+            this.weaponSystem.update(deltaTime, combinedKeys, this.player, this.canvas.width, this.canvas.height, aimInput);
+        }
+        
+        // Reset mouse delta
+        this.mouseDeltaY = 0;
         
         // Update independent clouds
         this.updateIndependentClouds(deltaTime);
@@ -121,6 +161,24 @@ class BungvoGame {
             }
         }
         
+        // Check obstacle collisions
+        const obstacleCollisions = this.world.checkObstacleCollisions(this.player);
+        if (obstacleCollisions.length > 0) {
+            // Player hit an obstacle
+            this.handleObstacleCollision(obstacleCollisions[0]);
+        }
+        
+        // Check bullet collisions with obstacles
+        if (this.world && this.world.obstacleManager) {
+            const activeObstacles = this.world.obstacleManager.getActiveObstacles();
+            const bulletHits = this.weaponSystem.checkBulletCollisions(activeObstacles);
+            bulletHits.forEach(obstacle => {
+                obstacle.destroy(); // Destroy obstacle when hit by bullet
+                this.score += 25; // Bonus points for destroying obstacles
+                this.updateUI();
+            });
+        }
+        
         // No platform or wall collisions needed - just walking on sidewalk
     }
     
@@ -136,6 +194,47 @@ class BungvoGame {
         
         // Play sound effect (if implemented)
         console.log('Coin collected!');
+    }
+    
+    handleObstacleCollision(obstacle) {
+        // Check if obstacle doesn't damage player (like police car)
+        if (!obstacle.damagesPlayer) {
+            // Player can stand on it or pass through without damage
+            console.log(`Player on ${obstacle.type} (no damage)`);
+            return;
+        }
+        
+        // Different behavior based on obstacle type and player state
+        if (this.player.isDashing) {
+            // Dashing through obstacles - destroy them or bounce off
+            if (obstacle.type === 'block' || obstacle.type === 'fence') {
+                // Destroy smaller obstacles when dashing with animation
+                obstacle.destroy();
+                this.score += 5; // Bonus points for destroying obstacles
+                console.log(`Destroyed ${obstacle.type} while dashing!`);
+                return;
+            }
+        }
+        
+        // Check if player is vulnerable (not invincible)
+        if (!this.player.isVulnerable()) {
+            return; // Player is invincible, ignore collision
+        }
+        
+        // Player takes damage - destroy obstacle with animation and lose life
+        console.log(`Player hit ${obstacle.type}!`);
+        obstacle.destroy(); // Start destruction animation
+        
+        // Apply damage with invincibility frames
+        if (this.player.takeDamage()) {
+            this.lives--;
+            this.updateUI();
+            
+            if (this.lives <= 0) {
+                this.gameOver();
+            }
+        }
+        // Don't respawn - just continue playing with fewer lives and invincibility
     }
     
     playerDied() {
@@ -194,10 +293,22 @@ class BungvoGame {
             this.player.render(this.ctx);
         }
         
+        // Render weapon system (bullets, shell casings, weapon)
+        if (this.weaponSystem && this.player) {
+            this.weaponSystem.renderBullets(this.ctx);
+            this.weaponSystem.renderShellCasings(this.ctx, this.canvas.height - 20);
+            this.weaponSystem.renderWeapon(this.ctx, this.player);
+        }
+        
         // Final restore
         this.ctx.restore();
         
         // Render UI elements (no transforms needed)
+        if (this.weaponSystem && this.ui && this.player) {
+            this.ui.renderWeaponUI(this.ctx, this.weaponSystem);
+            // Usunięto renderCrosshair - brak celownika
+        }
+        
         if (this.gameState === 'paused') {
             this.renderPauseScreen();
         }
@@ -400,11 +511,13 @@ class BungvoGame {
 
 // Global game instance
 let game;
+window.game = game; // Expose to window for canvas resize
 
 // Global functions for HTML buttons
 function startGame() {
     if (!game) {
         game = new BungvoGame();
+        window.game = game; // Expose to window
     }
     game.start();
 }
@@ -446,3 +559,74 @@ This uses the original Bungvo parallax system!`);
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Bungvo Enhanced loaded!');
 });
+
+
+// Gamepad support for menu navigation
+let menuSelectedIndex = 0;
+const menuButtons = [];
+
+function setupMenuGamepad() {
+    // Get menu buttons
+    const startButton = document.querySelector('.menu-button:nth-child(1)');
+    const instructionsButton = document.querySelector('.menu-button:nth-child(2)');
+    
+    if (startButton && instructionsButton) {
+        menuButtons.push(startButton, instructionsButton);
+        updateMenuSelection();
+    }
+}
+
+function updateMenuSelection() {
+    menuButtons.forEach((btn, index) => {
+        if (index === menuSelectedIndex) {
+            btn.style.transform = 'scale(1.1)';
+            btn.style.boxShadow = '0 0 20px rgba(102, 126, 234, 0.8)';
+        } else {
+            btn.style.transform = 'scale(1)';
+            btn.style.boxShadow = 'none';
+        }
+    });
+}
+
+function handleMenuGamepad() {
+    const menu = document.getElementById('menu');
+    if (!menu || menu.style.display === 'none') return;
+    
+    if (menuButtons.length === 0) {
+        setupMenuGamepad();
+    }
+    
+    const gamepads = navigator.getGamepads();
+    if (!gamepads) return;
+    
+    for (const gamepad of gamepads) {
+        if (!gamepad) continue;
+        
+        // D-pad or left stick up/down for navigation
+        const upPressed = gamepad.buttons[12]?.pressed || gamepad.axes[1] < -0.5;
+        const downPressed = gamepad.buttons[13]?.pressed || gamepad.axes[1] > 0.5;
+        const aPressed = gamepad.buttons[0]?.pressed; // A button to select
+        
+        // Debounce navigation
+        if (!gamepad.lastNavTime) gamepad.lastNavTime = 0;
+        const now = Date.now();
+        
+        if (upPressed && now - gamepad.lastNavTime > 200) {
+            menuSelectedIndex = Math.max(0, menuSelectedIndex - 1);
+            updateMenuSelection();
+            gamepad.lastNavTime = now;
+        } else if (downPressed && now - gamepad.lastNavTime > 200) {
+            menuSelectedIndex = Math.min(menuButtons.length - 1, menuSelectedIndex + 1);
+            updateMenuSelection();
+            gamepad.lastNavTime = now;
+        }
+        
+        // Select button
+        if (aPressed && menuButtons[menuSelectedIndex]) {
+            menuButtons[menuSelectedIndex].click();
+        }
+    }
+}
+
+// Poll gamepad in menu
+setInterval(handleMenuGamepad, 100);

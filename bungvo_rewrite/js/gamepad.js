@@ -107,15 +107,20 @@ class GamepadManager {
             keys['ArrowRight'] = true;
         }
         
-        // Jump
-        if (leftStickY < -this.deadzone || this.isButtonPressed(this.buttons.A) || this.isButtonPressed(this.buttons.DPAD_UP)) {
+        // Jump - only A button and D-pad up (removed left stick up)
+        if (this.isButtonPressed(this.buttons.A) || this.isButtonPressed(this.buttons.DPAD_UP)) {
             keys['KeyW'] = true;
             keys['ArrowUp'] = true;
             keys['Space'] = true;
         }
         
-        // Dash
+        // Shoot
         if (this.isButtonPressed(this.buttons.B)) {
+            keys['KeyX'] = true; // B button shoots
+        }
+        
+        // Dash - moved to X button
+        if (this.isButtonPressed(this.buttons.X)) {
             keys['ShiftLeft'] = true;
             keys['ShiftRight'] = true;
         }

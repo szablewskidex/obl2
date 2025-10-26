@@ -193,50 +193,104 @@
         </div>
         
         <div class="control-group">
-            <h3>🦵 Nogi</h3>
+            <h3>🦵 Lewa noga</h3>
             <div class="slider-container">
                 <label>Left Leg X:</label>
                 <input type="range" id="leftLegX" min="-20" max="20" value="0" oninput="updateAnimation()">
                 <div class="slider-value" id="leftLegX-value">0</div>
             </div>
             <div class="slider-container">
+                <label>Left Thigh Bend Y:</label>
+                <input type="range" id="leftThighBendY" min="-50" max="10" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="leftThighBendY-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Left Thigh Rotation:</label>
+                <input type="range" id="leftThighRotation" min="-1.5" max="1.5" step="0.1" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="leftThighRotation-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Left Shin Bend Y:</label>
+                <input type="range" id="leftShinBendY" min="-60" max="10" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="leftShinBendY-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Left Shin Bend X:</label>
+                <input type="range" id="leftShinBendX" min="-30" max="10" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="leftShinBendX-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Left Shin Rotation:</label>
+                <input type="range" id="leftShinRotation" min="-1.5" max="1.5" step="0.1" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="leftShinRotation-value">0</div>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <h3>🦵 Prawa noga</h3>
+            <div class="slider-container">
                 <label>Right Leg X:</label>
                 <input type="range" id="rightLegX" min="-20" max="20" value="0" oninput="updateAnimation()">
                 <div class="slider-value" id="rightLegX-value">0</div>
             </div>
             <div class="slider-container">
-                <label>Thigh Bend Y:</label>
-                <input type="range" id="thighBendY" min="-50" max="10" value="0" oninput="updateAnimation()">
-                <div class="slider-value" id="thighBendY-value">0</div>
+                <label>Right Thigh Bend Y:</label>
+                <input type="range" id="rightThighBendY" min="-50" max="10" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="rightThighBendY-value">0</div>
             </div>
             <div class="slider-container">
-                <label>Shin Bend Y:</label>
-                <input type="range" id="shinBendY" min="-60" max="10" value="0" oninput="updateAnimation()">
-                <div class="slider-value" id="shinBendY-value">0</div>
+                <label>Right Thigh Rotation:</label>
+                <input type="range" id="rightThighRotation" min="-1.5" max="1.5" step="0.1" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="rightThighRotation-value">0</div>
             </div>
             <div class="slider-container">
-                <label>Shin Bend X:</label>
-                <input type="range" id="shinBendX" min="-30" max="10" value="0" oninput="updateAnimation()">
-                <div class="slider-value" id="shinBendX-value">0</div>
+                <label>Right Shin Bend Y:</label>
+                <input type="range" id="rightShinBendY" min="-60" max="10" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="rightShinBendY-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Right Shin Bend X:</label>
+                <input type="range" id="rightShinBendX" min="-30" max="10" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="rightShinBendX-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Right Shin Rotation:</label>
+                <input type="range" id="rightShinRotation" min="-1.5" max="1.5" step="0.1" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="rightShinRotation-value">0</div>
             </div>
         </div>
         
         <div class="control-group">
             <h3>👟 Buty</h3>
             <div class="slider-container">
-                <label>Shoe Bend Y:</label>
-                <input type="range" id="shoeBendY" min="-70" max="10" value="0" oninput="updateAnimation()">
-                <div class="slider-value" id="shoeBendY-value">0</div>
+                <label>Left Shoe Bend Y:</label>
+                <input type="range" id="leftShoeBendY" min="-70" max="10" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="leftShoeBendY-value">0</div>
             </div>
             <div class="slider-container">
-                <label>Shoe Bend X:</label>
-                <input type="range" id="shoeBendX" min="-40" max="10" value="0" oninput="updateAnimation()">
-                <div class="slider-value" id="shoeBendX-value">0</div>
+                <label>Left Shoe Bend X:</label>
+                <input type="range" id="leftShoeBendX" min="-40" max="10" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="leftShoeBendX-value">0</div>
             </div>
             <div class="slider-container">
-                <label>Shoe Rotation:</label>
-                <input type="range" id="shoeRotation" min="-1.5" max="1.5" step="0.1" value="0" oninput="updateAnimation()">
-                <div class="slider-value" id="shoeRotation-value">0</div>
+                <label>Left Shoe Rotation:</label>
+                <input type="range" id="leftShoeRotation" min="-1.5" max="1.5" step="0.1" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="leftShoeRotation-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Right Shoe Bend Y:</label>
+                <input type="range" id="rightShoeBendY" min="-70" max="10" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="rightShoeBendY-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Right Shoe Bend X:</label>
+                <input type="range" id="rightShoeBendX" min="-40" max="10" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="rightShoeBendX-value">0</div>
+            </div>
+            <div class="slider-container">
+                <label>Right Shoe Rotation:</label>
+                <input type="range" id="rightShoeRotation" min="-1.5" max="1.5" step="0.1" value="0" oninput="updateAnimation()">
+                <div class="slider-value" id="rightShoeRotation-value">0</div>
             </div>
         </div>
         
@@ -272,8 +326,10 @@
         
         function updateAnimation() {
             // Update all slider values
-            ['headOffsetX', 'headOffsetY', 'headRotation', 'headScale', 'bodyOffsetX', 'bodyOffsetY', 'bodyRotation', 'bodyScale', 'leftLegX', 'rightLegX', 
-             'thighBendY', 'shinBendY', 'shinBendX', 'shoeBendY', 'shoeBendX', 'shoeRotation'].forEach(updateSliderValue);
+            ['headOffsetX', 'headOffsetY', 'headRotation', 'headScale', 'bodyOffsetX', 'bodyOffsetY', 'bodyRotation', 'bodyScale', 
+             'leftLegX', 'rightLegX', 'leftThighBendY', 'leftThighRotation', 'rightThighBendY', 'rightThighRotation',
+             'leftShinBendY', 'leftShinBendX', 'leftShinRotation', 'rightShinBendY', 'rightShinBendX', 'rightShinRotation',
+             'leftShoeBendY', 'leftShoeBendX', 'leftShoeRotation', 'rightShoeBendY', 'rightShoeBendX', 'rightShoeRotation'].forEach(updateSliderValue);
             
             if (!imageLoaded) return;
             
@@ -292,19 +348,30 @@
             const bodyScale = parseFloat(document.getElementById('bodyScale').value);
             const leftLegX = parseFloat(document.getElementById('leftLegX').value);
             const rightLegX = parseFloat(document.getElementById('rightLegX').value);
-            const thighBendY = parseFloat(document.getElementById('thighBendY').value);
-            const shinBendY = parseFloat(document.getElementById('shinBendY').value);
-            const shinBendX = parseFloat(document.getElementById('shinBendX').value);
-            const shoeBendY = parseFloat(document.getElementById('shoeBendY').value);
-            const shoeBendX = parseFloat(document.getElementById('shoeBendX').value);
-            const shoeRotation = parseFloat(document.getElementById('shoeRotation').value);
+            const leftThighBendY = parseFloat(document.getElementById('leftThighBendY').value);
+            const leftThighRotation = parseFloat(document.getElementById('leftThighRotation').value);
+            const rightThighBendY = parseFloat(document.getElementById('rightThighBendY').value);
+            const rightThighRotation = parseFloat(document.getElementById('rightThighRotation').value);
+            const leftShinBendY = parseFloat(document.getElementById('leftShinBendY').value);
+            const leftShinBendX = parseFloat(document.getElementById('leftShinBendX').value);
+            const leftShinRotation = parseFloat(document.getElementById('leftShinRotation').value);
+            const rightShinBendY = parseFloat(document.getElementById('rightShinBendY').value);
+            const rightShinBendX = parseFloat(document.getElementById('rightShinBendX').value);
+            const rightShinRotation = parseFloat(document.getElementById('rightShinRotation').value);
+            const leftShoeBendY = parseFloat(document.getElementById('leftShoeBendY').value);
+            const leftShoeBendX = parseFloat(document.getElementById('leftShoeBendX').value);
+            const leftShoeRotation = parseFloat(document.getElementById('leftShoeRotation').value);
+            const rightShoeBendY = parseFloat(document.getElementById('rightShoeBendY').value);
+            const rightShoeBendX = parseFloat(document.getElementById('rightShoeBendX').value);
+            const rightShoeRotation = parseFloat(document.getElementById('rightShoeRotation').value);
             
             // Draw character parts
             drawCharacter(playerX, playerY, {
                 headOffsetX, headOffsetY, headRotation, headScale, 
                 bodyOffsetX, bodyOffsetY, bodyRotation, bodyScale,
-                leftLegX, rightLegX, thighBendY, shinBendY, shinBendX,
-                shoeBendY, shoeBendX, shoeRotation
+                leftLegX, rightLegX, leftThighBendY, leftThighRotation, rightThighBendY, rightThighRotation,
+                leftShinBendY, leftShinBendX, leftShinRotation, rightShinBendY, rightShinBendX, rightShinRotation,
+                leftShoeBendY, leftShoeBendX, leftShoeRotation, rightShoeBendY, rightShoeBendX, rightShoeRotation
             });
         }
         
@@ -364,29 +431,61 @@
             const legWidth = playerWidth * 0.35;
             const legHeight = playerHeight * 0.8;
             
-            // Left thigh
-            ctx.drawImage(
-                characterAtlas,
-                50, 263, 40, 92,
-                x + playerWidth * 0.15 + params.leftLegX, legStartY + params.thighBendY,
-                legWidth, legHeight * 0.3
-            );
+            // Left thigh with rotation
+            if (params.leftThighRotation !== 0) {
+                ctx.save();
+                const thighX = x + playerWidth * 0.15 + params.leftLegX;
+                const thighY = legStartY + params.leftThighBendY;
+                const thighW = legWidth;
+                const thighH = legHeight * 0.3;
+                ctx.translate(thighX + thighW/2, thighY + thighH/2);
+                ctx.rotate(params.leftThighRotation);
+                ctx.drawImage(
+                    characterAtlas,
+                    50, 263, 40, 92,
+                    -thighW/2, -thighH/2, thighW, thighH
+                );
+                ctx.restore();
+            } else {
+                ctx.drawImage(
+                    characterAtlas,
+                    50, 263, 40, 92,
+                    x + playerWidth * 0.15 + params.leftLegX, legStartY + params.leftThighBendY,
+                    legWidth, legHeight * 0.3
+                );
+            }
             
-            // Left shin
-            ctx.drawImage(
-                characterAtlas,
-                43, 355, 53, 70,
-                x + playerWidth * 0.15 + params.leftLegX + params.shinBendX, legStartY + legHeight * 0.3 + params.shinBendY,
-                legWidth, legHeight * 0.3
-            );
+            // Left shin with rotation
+            if (params.leftShinRotation !== 0) {
+                ctx.save();
+                const shinX = x + playerWidth * 0.15 + params.leftLegX + params.leftShinBendX;
+                const shinY = legStartY + legHeight * 0.3 + params.leftShinBendY;
+                const shinW = legWidth;
+                const shinH = legHeight * 0.3;
+                ctx.translate(shinX + shinW/2, shinY + shinH/2);
+                ctx.rotate(params.leftShinRotation);
+                ctx.drawImage(
+                    characterAtlas,
+                    43, 355, 53, 70,
+                    -shinW/2, -shinH/2, shinW, shinH
+                );
+                ctx.restore();
+            } else {
+                ctx.drawImage(
+                    characterAtlas,
+                    43, 355, 53, 70,
+                    x + playerWidth * 0.15 + params.leftLegX + params.leftShinBendX, legStartY + legHeight * 0.3 + params.leftShinBendY,
+                    legWidth, legHeight * 0.3
+                );
+            }
             
             // Left shoe
-            if (params.shoeRotation !== 0) {
+            if (params.leftShoeRotation !== 0) {
                 ctx.save();
-                const shoeX = x + playerWidth * 0.1 + params.leftLegX + params.shoeBendX;
-                const shoeY = legStartY + legHeight * 0.5 + params.shoeBendY;
+                const shoeX = x + playerWidth * 0.1 + params.leftLegX + params.leftShoeBendX;
+                const shoeY = legStartY + legHeight * 0.5 + params.leftShoeBendY;
                 ctx.translate(shoeX + legWidth * 0.6, shoeY + legHeight * 0.1);
-                ctx.rotate(params.shoeRotation);
+                ctx.rotate(params.leftShoeRotation);
                 ctx.drawImage(
                     characterAtlas,
                     31, 442, 62, 68,
@@ -398,34 +497,66 @@
                 ctx.drawImage(
                     characterAtlas,
                     31, 442, 62, 68,
-                    x + playerWidth * 0.1 + params.leftLegX + params.shoeBendX, legStartY + legHeight * 0.5 + params.shoeBendY,
+                    x + playerWidth * 0.1 + params.leftLegX + params.leftShoeBendX, legStartY + legHeight * 0.5 + params.leftShoeBendY,
                     legWidth * 1.2, legHeight * 0.2
                 );
             }
             
-            // Right thigh
-            ctx.drawImage(
-                characterAtlas,
-                93, 261, 47, 97,
-                x + playerWidth * 0.5 + params.rightLegX, legStartY + params.thighBendY,
-                legWidth, legHeight * 0.3
-            );
+            // Right thigh with rotation
+            if (params.rightThighRotation !== 0) {
+                ctx.save();
+                const thighX = x + playerWidth * 0.5 + params.rightLegX;
+                const thighY = legStartY + params.rightThighBendY;
+                const thighW = legWidth;
+                const thighH = legHeight * 0.3;
+                ctx.translate(thighX + thighW/2, thighY + thighH/2);
+                ctx.rotate(params.rightThighRotation);
+                ctx.drawImage(
+                    characterAtlas,
+                    93, 261, 47, 97,
+                    -thighW/2, -thighH/2, thighW, thighH
+                );
+                ctx.restore();
+            } else {
+                ctx.drawImage(
+                    characterAtlas,
+                    93, 261, 47, 97,
+                    x + playerWidth * 0.5 + params.rightLegX, legStartY + params.rightThighBendY,
+                    legWidth, legHeight * 0.3
+                );
+            }
             
-            // Right shin
-            ctx.drawImage(
-                characterAtlas,
-                100, 361, 44, 64,
-                x + playerWidth * 0.5 + params.rightLegX + params.shinBendX, legStartY + legHeight * 0.3 + params.shinBendY,
-                legWidth, legHeight * 0.3
-            );
+            // Right shin with rotation
+            if (params.rightShinRotation !== 0) {
+                ctx.save();
+                const shinX = x + playerWidth * 0.5 + params.rightLegX + params.rightShinBendX;
+                const shinY = legStartY + legHeight * 0.3 + params.rightShinBendY;
+                const shinW = legWidth;
+                const shinH = legHeight * 0.3;
+                ctx.translate(shinX + shinW/2, shinY + shinH/2);
+                ctx.rotate(params.rightShinRotation);
+                ctx.drawImage(
+                    characterAtlas,
+                    100, 361, 44, 64,
+                    -shinW/2, -shinH/2, shinW, shinH
+                );
+                ctx.restore();
+            } else {
+                ctx.drawImage(
+                    characterAtlas,
+                    100, 361, 44, 64,
+                    x + playerWidth * 0.5 + params.rightLegX + params.rightShinBendX, legStartY + legHeight * 0.3 + params.rightShinBendY,
+                    legWidth, legHeight * 0.3
+                );
+            }
             
             // Right shoe
-            if (params.shoeRotation !== 0) {
+            if (params.rightShoeRotation !== 0) {
                 ctx.save();
-                const shoeX = x + playerWidth * 0.45 + params.rightLegX + params.shoeBendX;
-                const shoeY = legStartY + legHeight * 0.5 + params.shoeBendY;
+                const shoeX = x + playerWidth * 0.45 + params.rightLegX + params.rightShoeBendX;
+                const shoeY = legStartY + legHeight * 0.5 + params.rightShoeBendY;
                 ctx.translate(shoeX + legWidth * 0.6, shoeY + legHeight * 0.1);
-                ctx.rotate(params.shoeRotation);
+                ctx.rotate(params.rightShoeRotation);
                 ctx.drawImage(
                     characterAtlas,
                     97, 446, 83, 57,
@@ -437,7 +568,7 @@
                 ctx.drawImage(
                     characterAtlas,
                     97, 446, 83, 57,
-                    x + playerWidth * 0.45 + params.rightLegX + params.shoeBendX, legStartY + legHeight * 0.5 + params.shoeBendY,
+                    x + playerWidth * 0.45 + params.rightLegX + params.rightShoeBendX, legStartY + legHeight * 0.5 + params.rightShoeBendY,
                     legWidth * 1.2, legHeight * 0.2
                 );
             }
@@ -450,20 +581,23 @@
                 idle: {
                     headOffsetX: 0, headOffsetY: -25, headRotation: 0, headScale: 1.0, 
                     bodyOffsetX: 0, bodyOffsetY: -9, bodyRotation: 0, bodyScale: 1.0,
-                    leftLegX: 0, rightLegX: 0, thighBendY: 0, shinBendY: 0, shinBendX: 0,
-                    shoeBendY: 0, shoeBendX: 0, shoeRotation: 0
+                    leftLegX: 0, rightLegX: 0, leftThighBendY: 0, leftThighRotation: 0, rightThighBendY: 0, rightThighRotation: 0,
+                    leftShinBendY: 0, leftShinBendX: 0, leftShinRotation: 0, rightShinBendY: 0, rightShinBendX: 0, rightShinRotation: 0,
+                    leftShoeBendY: 0, leftShoeBendX: 0, leftShoeRotation: 0, rightShoeBendY: 0, rightShoeBendX: 0, rightShoeRotation: 0
                 },
                 jump: {
                     headOffsetX: 0, headOffsetY: -30, headRotation: 0, headScale: 1.0, 
                     bodyOffsetX: 0, bodyOffsetY: -14, bodyRotation: 0, bodyScale: 1.0,
-                    leftLegX: -2, rightLegX: 2, thighBendY: -10, shinBendY: -25, shinBendX: -8,
-                    shoeBendY: -30, shoeBendX: -20, shoeRotation: 0.8
+                    leftLegX: -2, rightLegX: 2, leftThighBendY: -10, leftThighRotation: 0, rightThighBendY: -10, rightThighRotation: 0,
+                    leftShinBendY: -25, leftShinBendX: -8, leftShinRotation: 0, rightShinBendY: -25, rightShinBendX: -8, rightShinRotation: 0,
+                    leftShoeBendY: -30, leftShoeBendX: -20, leftShoeRotation: 0.8, rightShoeBendY: -30, rightShoeBendX: -20, rightShoeRotation: 0.8
                 },
                 ball: {
                     headOffsetX: 0, headOffsetY: -15, headRotation: 0, headScale: 0.8, 
                     bodyOffsetX: 0, bodyOffsetY: -3, bodyRotation: 0, bodyScale: 0.7,
-                    leftLegX: 8, rightLegX: -8, thighBendY: -35, shinBendY: -45, shinBendX: -15,
-                    shoeBendY: -50, shoeBendX: -25, shoeRotation: 1.2
+                    leftLegX: 8, rightLegX: -8, leftThighBendY: -35, leftThighRotation: 0, rightThighBendY: -35, rightThighRotation: 0,
+                    leftShinBendY: -45, leftShinBendX: -15, leftShinRotation: 0, rightShinBendY: -45, rightShinBendX: -15, rightShinRotation: 0,
+                    leftShoeBendY: -50, leftShoeBendX: -25, leftShoeRotation: 1.2, rightShoeBendY: -50, rightShoeBendX: -25, rightShoeRotation: 1.2
                 }
             };
             
@@ -486,8 +620,10 @@
         function exportAnimation() {
             const animationName = document.getElementById('animationName').value || 'custom';
             const values = {};
-            ['headOffsetX', 'headOffsetY', 'headRotation', 'headScale', 'bodyOffsetX', 'bodyOffsetY', 'bodyRotation', 'bodyScale', 'leftLegX', 'rightLegX', 
-             'thighBendY', 'shinBendY', 'shinBendX', 'shoeBendY', 'shoeBendX', 'shoeRotation'].forEach(id => {
+            ['headOffsetX', 'headOffsetY', 'headRotation', 'headScale', 'bodyOffsetX', 'bodyOffsetY', 'bodyRotation', 'bodyScale', 
+             'leftLegX', 'rightLegX', 'leftThighBendY', 'leftThighRotation', 'rightThighBendY', 'rightThighRotation',
+             'leftShinBendY', 'leftShinBendX', 'leftShinRotation', 'rightShinBendY', 'rightShinBendX', 'rightShinRotation',
+             'leftShoeBendY', 'leftShoeBendX', 'leftShoeRotation', 'rightShoeBendY', 'rightShoeBendX', 'rightShoeRotation'].forEach(id => {
                 values[id] = parseFloat(document.getElementById(id).value);
             });
             
@@ -495,19 +631,31 @@
 } else if (this.animationState === '${animationName}') {
     // ${animationName} animation - custom animation from tester
     headOffsetX = ${values.headOffsetX};
-    bodyBob = ${values.headOffsetY};       // headOffsetY jako bodyBob dla głowy
+    headOffsetY = ${values.headOffsetY};
     headRotation = ${values.headRotation};
     bodyOffsetX = ${values.bodyOffsetX};
-    bodyBob = ${values.bodyOffsetY};       // bodyOffsetY
+    bodyOffsetY = ${values.bodyOffsetY};
     bodyRotation = ${values.bodyRotation};
     leftLegX = ${values.leftLegX};
     rightLegX = ${values.rightLegX};
-    thighBendY = ${values.thighBendY};
-    shinBendY = ${values.shinBendY};
-    shinBendX = ${values.shinBendX};
-    shoeBendY = ${values.shoeBendY};
-    shoeBendX = ${values.shoeBendX};
-    shoeRotation = ${values.shoeRotation};`;
+    // Lewa noga
+    leftThighBendY = ${values.leftThighBendY};
+    leftThighRotation = ${values.leftThighRotation};
+    leftShinBendY = ${values.leftShinBendY};
+    leftShinBendX = ${values.leftShinBendX};
+    leftShinRotation = ${values.leftShinRotation};
+    leftShoeBendY = ${values.leftShoeBendY};
+    leftShoeBendX = ${values.leftShoeBendX};
+    leftShoeRotation = ${values.leftShoeRotation};
+    // Prawa noga
+    rightThighBendY = ${values.rightThighBendY};
+    rightThighRotation = ${values.rightThighRotation};
+    rightShinBendY = ${values.rightShinBendY};
+    rightShinBendX = ${values.rightShinBendX};
+    rightShinRotation = ${values.rightShinRotation};
+    rightShoeBendY = ${values.rightShoeBendY};
+    rightShoeBendX = ${values.rightShoeBendX};
+    rightShoeRotation = ${values.rightShoeRotation};`;
             
             document.getElementById('codeOutput').innerHTML = `<div class="code-output">${code}</div>`;
         }

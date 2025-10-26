@@ -16,6 +16,15 @@ class Player {
             console.log('Character atlas loaded');
         };
 
+        // Load frontflip sprite
+        this.frontflipSprite = new Image();
+        this.frontflipSprite.src = 'assets/frontflip.png';
+        this.frontflipLoaded = false;
+        this.frontflipSprite.onload = () => {
+            this.frontflipLoaded = true;
+            console.log('Frontflip sprite loaded');
+        };
+
         // Physics properties - PLATFORMER with jumping
         this.velocityX = 0;
         this.velocityY = 0;
@@ -48,7 +57,7 @@ class Player {
         this.dashDuration = 0.2;
         this.dashPowerMax = 100; // Max dash power per charge
         this.dashPowerCost = 100; // Cost to dash (need full bar)
-        
+
         // Invincibility frames (i-frames) after taking damage
         this.isInvincible = false;
         this.invincibilityDuration = 1.0; // 1 second of invincibility
@@ -62,7 +71,7 @@ class Player {
         this.dashTimer = 0;
         this.dashKeyWasPressed = false; // Track if dash key was already pressed
         this.jumpKeyWasPressed = false; // Track if jump key was already pressed
-        
+
         // Front flip mechanics
         this.isFlipping = false;
         this.flipDuration = 0.4; // Czas trwania front flip - przyśpieszone z 0.8 na 0.4
@@ -152,10 +161,10 @@ class Player {
         const jumpPressed = keys['KeyW'] || keys['ArrowUp'] || keys['Space'];
         const jumpJustPressed = jumpPressed && !this.jumpKeyWasPressed;
         this.jumpKeyWasPressed = jumpPressed;
-        
+
         if (jumpJustPressed) {
             const currentTime = Date.now() / 1000; // Czas w sekundach
-            
+
             // Sprawdź czy to podwójny skok (tylko gdy jesteś w powietrzu)
             if (currentTime - this.lastJumpTime < this.doubleJumpWindow && !this.onGround && !this.isFlipping) {
                 // Podwójny skok = front flip
@@ -230,16 +239,16 @@ class Player {
         this.dashTimer = this.dashDuration;
         this.dashCharges--; // Consume one dash charge
     }
-    
+
     performFrontFlip() {
         // Rozpocznij front flip
         this.isFlipping = true;
         this.flipTimer = this.flipDuration;
         this.flipRotation = 0;
-        
+
         // Dodaj trochę prędkości w górę dla efektu
         this.velocityY = -this.jumpPower * 0.7; // Mniejszy skok niż normalny
-        
+
         console.log('Front flip started!');
     }
 
@@ -274,20 +283,20 @@ class Player {
                 this.isDashing = false;
             }
         }
-        
+
         // Front flip timer
         if (this.flipTimer > 0) {
             this.flipTimer -= deltaTime;
             // Oblicz rotację (pełny obrót 360 stopni = 2π radianów)
             const progress = 1 - (this.flipTimer / this.flipDuration);
             this.flipRotation = progress * Math.PI * 2; // Pełny obrót
-            
+
             if (this.flipTimer <= 0) {
                 this.isFlipping = false;
                 this.flipRotation = 0;
             }
         }
-        
+
         // Invincibility timer
         if (this.invincibilityTimer > 0) {
             this.invincibilityTimer -= deltaTime;
@@ -307,24 +316,91 @@ class Player {
         this.x += this.velocityX * deltaTime;
         this.y += this.velocityY * deltaTime;
 
+        // Check platform collisions (like police cars)
+        let onPlatform = false;
+        if (world.obstacleManager) {
+            const platforms = world.obstacleManager.getActiveObstacles().filter(o => o.isPlatform && !o.damagesPlayer);
+
+            for (const platform of platforms) {
+                const playerBottom = this.y + this.height;
+                const playerRight = this.x + this.width;
+                const playerLeft = this.x;
+                const playerCenterX = this.x + this.width / 2;
+
+                // Police car dimensions
+                const platformLeft = platform.x + 20;
+                const platformRight = platform.x + platform.width - 20;
+                const platformWidth = platformRight - platformLeft;
+
+                // Check if player is horizontally over the car
+                if (playerRight > platformLeft && playerLeft < platformRight) {
+                    // Calculate roof height based on position (sloped hood at front)
+                    // Front 30% of car has sloped hood, rest is flat roof
+                    const relativeX = (playerCenterX - platformLeft) / platformWidth;
+                    let platformRoofY;
+
+                    if (relativeX >= 0 && relativeX < 0.3) {
+                        // Front hood area - slopes up from 55% to 42%
+                        const hoodProgress = relativeX / 0.3;
+                        const hoodTop = platform.y + (platform.height * 0.55);
+                        const roofTop = platform.y + (platform.height * 0.42);
+                        platformRoofY = hoodTop - (hoodTop - roofTop) * hoodProgress;
+                    } else if (relativeX >= 0.3 && relativeX <= 1.0) {
+                        // Flat roof area
+                        platformRoofY = platform.y + (platform.height * 0.42);
+                    } else {
+                        continue; // Player not over car
+                    }
+
+                    // Check if player should be on the roof/hood
+                    if (playerBottom >= platformRoofY - 5 && playerBottom <= platformRoofY + 20) {
+                        // Snap player to roof height
+                        this.y = platformRoofY - this.height;
+                        if (this.velocityY > 0) {
+                            this.velocityY = 0;
+                        }
+                        this.onGround = true;
+                        onPlatform = true;
+                        break;
+                    }
+                }
+
+                // Check side collision - can't walk through car
+                const platformBottom = platform.y + platform.height;
+                const platformRoofFlat = platform.y + (platform.height * 0.42);
+                if (playerBottom > platformRoofFlat + 20 && this.y < platformBottom - 20) {
+                    // Player is at car body height, check horizontal collision
+                    if (this.velocityX > 0 && playerRight > platformLeft && playerLeft < platformLeft) {
+                        // Hitting from left
+                        this.x = platformLeft - this.width;
+                        this.velocityX = 0;
+                    } else if (this.velocityX < 0 && playerLeft < platformRight && playerRight > platformRight) {
+                        // Hitting from right
+                        this.x = platformRight;
+                        this.velocityX = 0;
+                    }
+                }
+            }
+        }
+
         // Simple ground collision (sidewalk level) - dostosowane do wysokości postaci
         const groundY = world.height - 20;  // Zmienione z -40 na -20 żeby stopy były dokładnie na chodnik
         const tolerance = 2; // Small tolerance for floating point errors
 
-        if (this.y + this.height >= groundY - tolerance) {
+        if (!onPlatform && this.y + this.height >= groundY - tolerance) {
             this.y = groundY - this.height;
             this.velocityY = 0;
             this.onGround = true;
-        } else {
+        } else if (!onPlatform) {
             this.onGround = false;
         }
 
         // Keep player in screen bounds with margin
         const margin = 10; // Small margin to prevent edge glitches
 
-        // Left edge
-        if (this.x < margin) {
-            this.x = margin;
+        // Left edge - hard stop at 0 (can't go off screen left)
+        if (this.x < 0) {
+            this.x = 0;
             this.velocityX = 0;
             if (this.isDashing) {
                 this.isDashing = false; // Stop dash at edge
@@ -374,7 +450,7 @@ class Player {
     render(ctx) {
         // Draw player without using ctx.translate to avoid affecting other elements
         ctx.save();
-        
+
         // Flashing effect during invincibility
         if (this.isInvincible) {
             // Flash every 0.1 seconds
@@ -398,6 +474,33 @@ class Player {
     }
 
     drawPlayerAtPosition(ctx, x, y) {
+        // Special rendering for frontflip
+        if (this.isFlipping && this.frontflipLoaded) {
+            ctx.save();
+
+            // Calculate center point for rotation
+            const centerX = x + this.width / 2;
+            const centerY = y + this.height / 2;
+
+            // Move to center, rotate, then draw
+            ctx.translate(centerX, centerY);
+            ctx.rotate(this.flipRotation * this.facingDirection);
+
+            // Draw frontflip sprite (fixed proportions - less stretched)
+            const flipWidth = this.width * 1.3;  // Slightly bigger than normal character
+            const flipHeight = this.width * 1.3; // Make height same as width for square proportions
+            ctx.drawImage(
+                this.frontflipSprite,
+                -flipWidth / 2,
+                -flipHeight / 2,
+                flipWidth,
+                flipHeight
+            );
+
+            ctx.restore();
+            return;
+        }
+
         if (!this.imageLoaded) {
             // Fallback - draw simple character silhouette
             ctx.fillStyle = '#d4af37'; // Gold color like in original
@@ -573,17 +676,17 @@ class Player {
         // Draw head with rotation and custom offsets - dostosowane do animation testera
         let finalHeadOffsetY = y + headOffsetY;  // Bezwzględny offset jak w animation testerze
         let headScale = 1.0;
-        
+
         // Jeśli nie ma custom offsetu, użyj domyślnej pozycji
         if (headOffsetY === 0) {
             finalHeadOffsetY = y - this.height * 0.42;
         }
-        
+
         // Podczas front flip głowa jest bliżej ciała (kulka)
         if (this.isFlipping) {
             headScale = 0.8; // Głowa trochę mniejsza dla efektu kulki
         }
-        
+
         // Draw head with rotation
         if (headRotation !== 0) {
             ctx.save();
@@ -591,12 +694,12 @@ class Player {
             const headY = finalHeadOffsetY;
             const headW = this.width * 1.4 * headScale;
             const headH = this.height * 0.35 * headScale;
-            ctx.translate(headX + headW/2, headY + headH/2);
+            ctx.translate(headX + headW / 2, headY + headH / 2);
             ctx.rotate(headRotation);
             ctx.drawImage(
                 this.characterAtlas,
                 20, 7, 154, 126,
-                -headW/2, -headH/2, headW, headH
+                -headW / 2, -headH / 2, headW, headH
             );
             ctx.restore();
         } else {
@@ -611,17 +714,17 @@ class Player {
         // Draw torso with rotation and custom offsets - dostosowane do animation testera
         let bodyScale = 1.0;
         let finalBodyOffsetY = y + bodyOffsetY + bodyBob;  // Bezwzględny offset jak w animation testerze
-        
+
         // Jeśli nie ma custom offsetu, użyj domyślnej pozycji
         if (bodyOffsetY === 0) {
             finalBodyOffsetY = y - this.height * 0.15 + bodyBob;
         }
-        
+
         // Podczas front flip tors jest mniejszy (kulka)
         if (this.isFlipping) {
             bodyScale = 0.8; // Tors trochę mniejszy dla efektu kulki
         }
-        
+
         // Draw torso with rotation
         if (bodyRotation !== 0) {
             ctx.save();
@@ -629,19 +732,19 @@ class Player {
             const bodyY = finalBodyOffsetY;
             const bodyW = this.width * 0.8 * bodyScale;
             const bodyH = this.height * 0.4 * bodyScale;
-            ctx.translate(bodyX + bodyW/2, bodyY + bodyH/2);
+            ctx.translate(bodyX + bodyW / 2, bodyY + bodyH / 2);
             ctx.rotate(bodyRotation);
             ctx.drawImage(
                 this.characterAtlas,
                 6, 137, 165, 124,
-                -bodyW/2, -bodyH/2, bodyW, bodyH
+                -bodyW / 2, -bodyH / 2, bodyW, bodyH
             );
             ctx.restore();
         } else {
             ctx.drawImage(
                 this.characterAtlas,
                 6, 137, 165, 124,  // BODY - nowe współrzędne z atlas picker
-                x + this.width * 0.1 + bodyOffsetX, finalBodyOffsetY, 
+                x + this.width * 0.1 + bodyOffsetX, finalBodyOffsetY,
                 this.width * 0.8 * bodyScale, this.height * 0.4 * bodyScale
             );
         }
@@ -658,12 +761,12 @@ class Player {
             const thighY = legStartY + leftThighBendY;
             const thighW = legWidth;
             const thighH = legHeight * 0.3;
-            ctx.translate(thighX + thighW/2, thighY + thighH/2);
+            ctx.translate(thighX + thighW / 2, thighY + thighH / 2);
             ctx.rotate(leftThighRotation);
             ctx.drawImage(
                 this.characterAtlas,
                 50, 263, 40, 92,
-                -thighW/2, -thighH/2, thighW, thighH
+                -thighW / 2, -thighH / 2, thighW, thighH
             );
             ctx.restore();
         } else {
@@ -682,12 +785,12 @@ class Player {
             const shinY = legStartY + legHeight * 0.3 + leftShinBendY;
             const shinW = legWidth;
             const shinH = legHeight * 0.3;
-            ctx.translate(shinX + shinW/2, shinY + shinH/2);
+            ctx.translate(shinX + shinW / 2, shinY + shinH / 2);
             ctx.rotate(leftShinRotation);
             ctx.drawImage(
                 this.characterAtlas,
                 43, 355, 53, 70,
-                -shinW/2, -shinH/2, shinW, shinH
+                -shinW / 2, -shinH / 2, shinW, shinH
             );
             ctx.restore();
         } else {
@@ -729,12 +832,12 @@ class Player {
             const thighY = legStartY + rightThighBendY;
             const thighW = legWidth;
             const thighH = legHeight * 0.3;
-            ctx.translate(thighX + thighW/2, thighY + thighH/2);
+            ctx.translate(thighX + thighW / 2, thighY + thighH / 2);
             ctx.rotate(rightThighRotation);
             ctx.drawImage(
                 this.characterAtlas,
                 93, 261, 47, 97,
-                -thighW/2, -thighH/2, thighW, thighH
+                -thighW / 2, -thighH / 2, thighW, thighH
             );
             ctx.restore();
         } else {
@@ -753,12 +856,12 @@ class Player {
             const shinY = legStartY + legHeight * 0.3 + rightShinBendY;
             const shinW = legWidth;
             const shinH = legHeight * 0.3;
-            ctx.translate(shinX + shinW/2, shinY + shinH/2);
+            ctx.translate(shinX + shinW / 2, shinY + shinH / 2);
             ctx.rotate(rightShinRotation);
             ctx.drawImage(
                 this.characterAtlas,
                 100, 361, 44, 64,
-                -shinW/2, -shinH/2, shinW, shinH
+                -shinW / 2, -shinH / 2, shinW, shinH
             );
             ctx.restore();
         } else {
@@ -797,7 +900,7 @@ class Player {
         if (this.facingDirection < 0) {
             ctx.restore();
         }
-        
+
         // Restore front flip rotation
         if (this.isFlipping && this.flipRotation !== 0) {
             ctx.restore();
@@ -834,17 +937,17 @@ class Player {
     getDashCharges() {
         return this.dashCharges;
     }
-    
+
     takeDamage() {
         if (this.isInvincible) return false; // Already invincible, no damage
-        
+
         // Activate invincibility
         this.isInvincible = true;
         this.invincibilityTimer = this.invincibilityDuration;
-        
+
         return true; // Damage taken
     }
-    
+
     isVulnerable() {
         return !this.isInvincible;
     }

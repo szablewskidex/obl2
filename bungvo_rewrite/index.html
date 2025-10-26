@@ -2,32 +2,125 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="theme-color" content="#667eea">
     <title>Bungvo Enhanced - HTML5 Rewrite</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="assets/charatlas.png">
     <style>
-        body {
+        * {
             margin: 0;
             padding: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: #000;
             font-family: 'Arial', sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
             overflow: hidden;
+            width: 100%;
+            height: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
         }
         
         #gameContainer {
-            position: relative;
-            border: 3px solid #333;
-            border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             background: #000;
+        }
+        
+        /* Mobile touch controls */
+        #touchControls {
+            display: none;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .touch-button {
+            position: absolute;
+            pointer-events: auto;
+            opacity: 0.6;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        
+        .touch-button:active {
+            opacity: 1;
+        }
+        
+        .touch-button img {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        #btnLeft {
+            bottom: 20px;
+            left: 20px;
+            width: 80px;
+            height: 80px;
+        }
+        
+        #btnRight {
+            bottom: 20px;
+            left: 120px;
+            width: 80px;
+            height: 80px;
+        }
+        
+        #btnJump {
+            bottom: 20px;
+            right: 120px;
+            width: 80px;
+            height: 80px;
+        }
+        
+        #btnDash {
+            bottom: 20px;
+            right: 20px;
+            width: 80px;
+            height: 80px;
         }
         
         #gameCanvas {
             display: block;
-            background: #1a1a2e;  /* Dark background like original */
+            width: 100%;
+            height: 100%;
+            background: #1a1a2e;
+            touch-action: none;
+            object-fit: cover;
+        }
+        
+        /* Mobile - show touch controls */
+        @media (max-width: 767px) {
+            #touchControls {
+                display: block;
+            }
+        }
+        
+        /* Desktop styling - also fullscreen */
+        @media (min-width: 768px) {
+            #gameCanvas {
+                width: 100% !important;
+                height: 100% !important;
+            }
         }
         
         #ui {
@@ -140,7 +233,7 @@
 </head>
 <body>
     <div id="gameContainer">
-        <canvas id="gameCanvas" width="1024" height="600"></canvas>
+        <canvas id="gameCanvas"></canvas>
         
         <div id="ui">
             <div>Score: <span id="score">0</span></div>
@@ -159,7 +252,7 @@
         </div>
         
         <div id="controls">
-            Controls: W/Space - Jump | A/D - Move Left/Right | Shift - Dash | ESC - Menu
+            Controls: W/Space - Jump | A/D - Move | Shift - Dash | X/Z/LMB - Shoot | R - Reload | ESC - Menu
         </div>
         
         <div id="menu">
@@ -174,15 +267,124 @@
                 Original assets from Godot version
             </div>
         </div>
+        
+        <!-- Mobile touch controls -->
+        <div id="touchControls">
+            <div id="btnLeft" class="touch-button">
+                <img src="assets/5213358-middle.png" style="transform: rotate(180deg);" alt="Left">
+            </div>
+            <div id="btnRight" class="touch-button">
+                <img src="assets/5213358-middle.png" alt="Right">
+            </div>
+            <div id="btnJump" class="touch-button">
+                <img src="assets/5213358-middle.png" style="transform: rotate(90deg);" alt="Jump">
+            </div>
+            <div id="btnDash" class="touch-button">
+                <img src="assets/5213358-middle.png" style="transform: rotate(-90deg);" alt="Dash">
+            </div>
+        </div>
     </div>
 
     <script src="js/game.js"></script>
-    <script src="js/player.js"></script>
-    <script src="js/world.js"></script>
+    <script src="js/obstacles.js?v=8"></script>
+    <script src="js/weapons.js"></script>
+    <script src="js/player.js?v=3"></script>
+    <script src="js/world.js?v=5"></script>
     <script src="js/physics.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/gamepad.js"></script>
     <script src="js/fullscreen.js"></script>
-    <script src="js/main.js"></script>
+    <script src="js/main.js?v=5"></script>
+    
+    <script>
+        // Setup responsive canvas - fullscreen with proper scaling
+        function setupCanvas() {
+            const canvas = document.getElementById('gameCanvas');
+            
+            // Use actual screen dimensions
+            const screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            const screenHeight = window.innerHeight || document.documentElement.clientHeight;
+            
+            // For PWA, use 1:1 pixel ratio to avoid zoom issues
+            const dpr = 1; // Fixed DPR to prevent zoom issues on PWA
+            
+            // Set canvas to screen size
+            canvas.width = screenWidth * dpr;
+            canvas.height = screenHeight * dpr;
+            
+            // Ensure canvas CSS size matches screen
+            canvas.style.width = screenWidth + 'px';
+            canvas.style.height = screenHeight + 'px';
+            
+            console.log(`Canvas: ${canvas.width}x${canvas.height} (DPR: ${dpr}, Screen: ${screenWidth}x${screenHeight})`);
+        }
+        
+        // Setup canvas before game starts
+        setupCanvas();
+        
+        // Setup touch controls for mobile
+        function setupTouchControls() {
+            const isMobile = window.innerWidth < 768;
+            if (!isMobile) return;
+            
+            const touchButtons = {
+                btnLeft: 'KeyA',
+                btnRight: 'KeyD',
+                btnJump: 'Space',
+                btnDash: 'ShiftLeft'
+            };
+            
+            Object.keys(touchButtons).forEach(btnId => {
+                const btn = document.getElementById(btnId);
+                const keyCode = touchButtons[btnId];
+                
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (window.game && window.game.keys) {
+                        window.game.keys[keyCode] = true;
+                    }
+                });
+                
+                btn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    if (window.game && window.game.keys) {
+                        window.game.keys[keyCode] = false;
+                    }
+                });
+                
+                btn.addEventListener('touchcancel', (e) => {
+                    e.preventDefault();
+                    if (window.game && window.game.keys) {
+                        window.game.keys[keyCode] = false;
+                    }
+                });
+            });
+        }
+        
+        // Setup touch controls after page loads
+        window.addEventListener('load', setupTouchControls);
+        
+        // Handle orientation change on mobile
+        window.addEventListener('resize', () => {
+            setupCanvas();
+            // Reload game with new dimensions if needed
+            if (window.game) {
+                location.reload();
+            }
+        });
+        
+        // Register service worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registered:', registration.scope);
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed:', err);
+                    });
+            });
+        }
+    </script>
 </body>
 </html>
