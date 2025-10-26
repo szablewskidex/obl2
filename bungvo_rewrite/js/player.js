@@ -48,6 +48,11 @@ class Player {
         this.dashDuration = 0.2;
         this.dashPowerMax = 100; // Max dash power per charge
         this.dashPowerCost = 100; // Cost to dash (need full bar)
+        
+        // Invincibility frames (i-frames) after taking damage
+        this.isInvincible = false;
+        this.invincibilityDuration = 1.0; // 1 second of invincibility
+        this.invincibilityTimer = 0;
         this.dashPowerPerCoin = 33.34; // Power gained per coin (3 coins = full bar)
         this.dashCharges = 0; // Number of full dash charges stored
         this.dashMaxCharges = 99; // Maximum charges you can store
@@ -60,7 +65,7 @@ class Player {
         
         // Front flip mechanics
         this.isFlipping = false;
-        this.flipDuration = 0.8; // Czas trwania front flip
+        this.flipDuration = 0.4; // Czas trwania front flip - przyśpieszone z 0.8 na 0.4
         this.flipTimer = 0;
         this.flipRotation = 0; // Aktualny kąt obrotu
         this.lastJumpTime = 0; // Czas ostatniego skoku
@@ -282,6 +287,14 @@ class Player {
                 this.flipRotation = 0;
             }
         }
+        
+        // Invincibility timer
+        if (this.invincibilityTimer > 0) {
+            this.invincibilityTimer -= deltaTime;
+            if (this.invincibilityTimer <= 0) {
+                this.isInvincible = false;
+            }
+        }
     }
 
     applyPhysics(deltaTime, world) {
@@ -361,6 +374,17 @@ class Player {
     render(ctx) {
         // Draw player without using ctx.translate to avoid affecting other elements
         ctx.save();
+        
+        // Flashing effect during invincibility
+        if (this.isInvincible) {
+            // Flash every 0.1 seconds
+            const flashSpeed = 10; // Hz
+            const visible = Math.floor(this.invincibilityTimer * flashSpeed) % 2 === 0;
+            if (!visible) {
+                ctx.restore();
+                return; // Skip rendering this frame for flashing effect
+            }
+        }
 
         // Draw player based on animation state at direct coordinates
         this.drawPlayerAtPosition(ctx, this.x, this.y);
@@ -384,12 +408,12 @@ class Player {
         // Apply front flip rotation
         if (this.isFlipping && this.flipRotation !== 0) {
             ctx.save();
-            // Obróć wokół środka postaci
-            ctx.translate(x + this.width / 2, y + this.height / 2);
+            // Obróć wokół środka torsu (bardziej naturalnie)
+            const torsoX = x + this.width * 0.5;  // Środek torsu X
+            const torsoY = y + this.height * 0.3;  // Środek torsu Y (wyżej niż środek postaci)
+            ctx.translate(torsoX, torsoY);
             ctx.rotate(this.flipRotation);
-            ctx.translate(-this.width / 2, -this.height / 2);
-            x = 0;
-            y = 0;
+            ctx.translate(-torsoX, -torsoY);
         }
 
         // Flip horizontally if facing left
@@ -409,82 +433,154 @@ class Player {
         let bodyOffsetX = 0; // Przesunięcie torsu X
         let bodyOffsetY = 0; // Przesunięcie torsu Y
         let bodyRotation = 0; // Rotacja torsu
-        let thighBendY = 0;  // Zginanie ud
-        let shinBendY = 0;   // Zginanie łydek (więcej do tyłu)
-        let shinBendX = 0;   // Przesunięcie łydek do tyłu
-        let shoeBendY = 0;   // Zginanie butów
-        let shoeBendX = 0;   // Przesunięcie butów do tyłu
-        let shoeRotation = 0; // Rotacja butów (w radianach)
+        // Lewa noga
+        let leftThighBendY = 0;
+        let leftThighRotation = 0;
+        let leftShinBendY = 0;
+        let leftShinBendX = 0;
+        let leftShinRotation = 0;
+        let leftShoeBendY = 0;
+        let leftShoeBendX = 0;
+        let leftShoeRotation = 0;
+        // Prawa noga
+        let rightThighBendY = 0;
+        let rightThighRotation = 0;
+        let rightShinBendY = 0;
+        let rightShinBendX = 0;
+        let rightShinRotation = 0;
+        let rightShoeBendY = 0;
+        let rightShoeBendX = 0;
+        let rightShoeRotation = 0;
 
         if (this.animationState === 'idle') {
-            // Simple idle animation - wszystko w normalnych pozycjach
-            headOffsetX = 0;
-            headOffsetY = 0;
+            // walking position fixed animation - custom animation from tester
+            headOffsetX = -4;
+            headOffsetY = -45;
             headRotation = 0;
             bodyOffsetX = 0;
-            bodyOffsetY = 0;
+            bodyOffsetY = -9;
             bodyRotation = 0;
-            leftLegX = 0;
-            rightLegX = 0;
-            thighBendY = 0;
-            shinBendY = 0;
-            shinBendX = 0;
-            shoeBendY = 0;
-            shoeBendX = 0;
-            shoeRotation = 0;
-            bodyBob = 0; // Brak dodatkowego ruchu
+            leftLegX = 6;
+            rightLegX = -1;
+            // Lewa noga
+            leftThighBendY = 8;
+            leftThighRotation = 0;
+            leftShinBendY = 1;
+            leftShinBendX = -1;
+            leftShinRotation = 0;
+            leftShoeBendY = 0;
+            leftShoeBendX = -1;
+            leftShoeRotation = 0;
+            // Prawa noga
+            rightThighBendY = 8;
+            rightThighRotation = 0;
+            rightShinBendY = 0;
+            rightShinBendX = 0;
+            rightShinRotation = 0;
+            rightShoeBendY = 0;
+            rightShoeBendX = 5;
+            rightShoeRotation = 0;
+            bodyBob = 0;
         } else if (this.animationState === 'running') {
-            // Simple walking animation - legs move side to side (zmniejszony ruch)
+            // walking position fixed animation with leg movement
             const cycle = Math.sin(this.animationTimer * 10);
-            leftLegX = cycle * 4;  // Zmniejszone z 8 na 4
-            rightLegX = -cycle * 4;  // Zmniejszone z 8 na 4
+            headOffsetX = -4;
+            headOffsetY = -45;
+            headRotation = 0;
+            bodyOffsetX = 0;
+            bodyOffsetY = -9;
+            bodyRotation = 0;
+            leftLegX = 6 + cycle * 4;  // Bazowa pozycja + ruch
+            rightLegX = -1 - cycle * 4;  // Bazowa pozycja + ruch
+            // Lewa noga
+            leftThighBendY = 8;
+            leftThighRotation = 0;
+            leftShinBendY = 1;
+            leftShinBendX = -1;
+            leftShinRotation = 0;
+            leftShoeBendY = 0;
+            leftShoeBendX = -1;
+            leftShoeRotation = 0;
+            // Prawa noga
+            rightThighBendY = 8;
+            rightThighRotation = 0;
+            rightShinBendY = 0;
+            rightShinBendX = 0;
+            rightShinRotation = 0;
+            rightShoeBendY = 0;
+            rightShoeBendX = 5;
+            rightShoeRotation = 0;
             bodyBob = Math.abs(cycle) * -2;
         } else if (this.animationState === 'flipping') {
-            // Front flip animation - curl into ball like Sonic
-            // Wszystkie części ciała zginają się do środka w kulkę
-            thighBendY = -35;    // Uda mocno do góry
-            shinBendY = -45;     // Łydki jeszcze wyżej
-            shinBendX = -15;     // Łydki do środka
-            shoeBendY = -50;     // Buty najwyżej
-            shoeBendX = -25;     // Buty mocno do środka
-            shoeRotation = 1.2;  // Mocna rotacja butów
-            leftLegX = 8;        // Nogi do środka (odwrotnie niż zwykle)
-            rightLegX = -8;      // Nogi do środka
-            bodyBob = -15;       // Ciało mocno do góry, bliżej głowy
+            // frontflip animation - custom animation from tester
+            headOffsetX = -14;
+            headOffsetY = -44;
+            headRotation = -0.1;
+            bodyOffsetX = -5;
+            bodyOffsetY = -9;
+            bodyRotation = -0.2;
+            leftLegX = -14;
+            rightLegX = -19;
+            // Lewa noga
+            leftThighBendY = -9;
+            leftThighRotation = 1.5;
+            leftShinBendY = -42;
+            leftShinBendX = -21;
+            leftShinRotation = 1.5;
+            leftShoeBendY = -59;
+            leftShoeBendX = -31;
+            leftShoeRotation = 1.5;
+            // Prawa noga
+            rightThighBendY = -5;
+            rightThighRotation = 1.1;
+            rightShinBendY = -29;
+            rightShinBendX = -20;
+            rightShinRotation = 1.5;
+            rightShoeBendY = -44;
+            rightShoeBendX = -35;
+            rightShoeRotation = 1.5;
         } else if (this.animationState === 'jumping' && !this.isFlipping) {
-            // Jump animation - bend legs like sitting on knees (tylko gdy nie ma front flip)
-            if (this.velocityY < 0) {
-                // Going up - bend legs more (jak siadanie na kolanach)
-                thighBendY = -10;   // Uda lekko do góry
-                shinBendY = -25;    // Łydki mocno do góry
-                shinBendX = -8;     // Łydki do tyłu
-                shoeBendY = -30;    // Buty jeszcze wyżej
-                shoeBendX = -20;    // Buty jeszcze bardziej do tyłu (zwiększone z -12 na -20)
-                shoeRotation = 0.8; // Rotacja butów do tyłu (około +45 stopni) - zwiększone z 0.5
-                leftLegX = -2;      // Lekko do środka
-                rightLegX = 2;      // Lekko do środka
-                bodyBob = -5;       // Ciało lekko do góry podczas skoku
-            } else {
-                // Falling down - legs slightly bent
-                thighBendY = -5;
-                shinBendY = -15;
-                shinBendX = -5;
-                shoeBendY = -18;
-                shoeBendX = -15;    // Zwiększone z -8 na -15
-                shoeRotation = 0.5; // Mniejsza rotacja podczas spadania - zwiększone z 0.3
-                leftLegX = -1;
-                rightLegX = 1;
-                bodyBob = -2;       // Ciało lekko do góry podczas spadania
-            }
+            // jump animation - custom animation from tester
+            headOffsetX = -3;
+            headOffsetY = -46;
+            headRotation = -0.4;
+            bodyOffsetX = 1;
+            bodyOffsetY = -14;
+            bodyRotation = 0;
+            leftLegX = -2;
+            rightLegX = 2;
+            // Lewa noga
+            leftThighBendY = -10;
+            leftThighRotation = 0.8;
+            leftShinBendY = -33;
+            leftShinBendX = -15;
+            leftShinRotation = 1.3;
+            leftShoeBendY = -43;
+            leftShoeBendX = -27;
+            leftShoeRotation = 0.8;
+            // Prawa noga
+            rightThighBendY = -2;
+            rightThighRotation = 0;
+            rightShinBendY = -16;
+            rightShinBendX = -9;
+            rightShinRotation = 0.8;
+            rightShoeBendY = -22;
+            rightShoeBendX = -15;
+            rightShoeRotation = 0.8;
+            bodyBob = 0;
         }
 
-        // Draw head with rotation and custom offsets
-        let finalHeadOffsetY = y - this.height * 0.42 + headOffsetY;
+        // Draw head with rotation and custom offsets - dostosowane do animation testera
+        let finalHeadOffsetY = y + headOffsetY;  // Bezwzględny offset jak w animation testerze
         let headScale = 1.0;
+        
+        // Jeśli nie ma custom offsetu, użyj domyślnej pozycji
+        if (headOffsetY === 0) {
+            finalHeadOffsetY = y - this.height * 0.42;
+        }
         
         // Podczas front flip głowa jest bliżej ciała (kulka)
         if (this.isFlipping) {
-            finalHeadOffsetY = y - this.height * 0.25 + headOffsetY; // Głowa bliżej ciała
             headScale = 0.8; // Głowa trochę mniejsza dla efektu kulki
         }
         
@@ -512,14 +608,18 @@ class Player {
             );
         }
 
-        // Draw torso with rotation and custom offsets
+        // Draw torso with rotation and custom offsets - dostosowane do animation testera
         let bodyScale = 1.0;
-        let finalBodyOffsetY = y - this.height * 0.15 + bodyBob + bodyOffsetY;
+        let finalBodyOffsetY = y + bodyOffsetY + bodyBob;  // Bezwzględny offset jak w animation testerze
+        
+        // Jeśli nie ma custom offsetu, użyj domyślnej pozycji
+        if (bodyOffsetY === 0) {
+            finalBodyOffsetY = y - this.height * 0.15 + bodyBob;
+        }
         
         // Podczas front flip tors jest mniejszy (kulka)
         if (this.isFlipping) {
-            bodyScale = 0.7; // Tors mniejszy
-            finalBodyOffsetY = y - this.height * 0.05 + bodyBob + bodyOffsetY; // Tors bliżej nóg
+            bodyScale = 0.8; // Tors trochę mniejszy dla efektu kulki
         }
         
         // Draw torso with rotation
@@ -551,80 +651,144 @@ class Player {
         const legWidth = this.width * 0.35;
         const legHeight = this.height * 0.8;
 
-        // LEFT THIGH - using coordinates from atlas picker
-        ctx.drawImage(
-            this.characterAtlas,
-            50, 263, 40, 92,  // L_THIGH - nowe współrzędne z atlas picker
-            x + this.width * 0.15 + leftLegX, legStartY + thighBendY,  // Uda z własnym offsetem
-            legWidth, legHeight * 0.3
-        );
-
-        // LEFT SHIN - using coordinates from atlas picker (zginane do tyłu)
-        ctx.drawImage(
-            this.characterAtlas,
-            43, 355, 53, 70,  // L_SHIN - nowe współrzędne z atlas picker
-            x + this.width * 0.15 + leftLegX + shinBendX, legStartY + legHeight * 0.3 + shinBendY,  // Łydka do tyłu i do góry
-            legWidth, legHeight * 0.3
-        );
-
-        // LEFT SHOE - using coordinates from atlas picker (z rotacją)
-        if (shoeRotation !== 0) {
+        // LEFT THIGH with individual rotation
+        if (leftThighRotation !== 0) {
             ctx.save();
-            const shoeX = x + this.width * 0.1 + leftLegX + shoeBendX;
-            const shoeY = legStartY + legHeight * 0.5 + shoeBendY;
-            ctx.translate(shoeX + legWidth * 0.6, shoeY + legHeight * 0.1); // Środek buta
-            ctx.rotate(shoeRotation);
+            const thighX = x + this.width * 0.15 + leftLegX;
+            const thighY = legStartY + leftThighBendY;
+            const thighW = legWidth;
+            const thighH = legHeight * 0.3;
+            ctx.translate(thighX + thighW/2, thighY + thighH/2);
+            ctx.rotate(leftThighRotation);
             ctx.drawImage(
                 this.characterAtlas,
-                31, 442, 62, 68,  // L_SHOE - nowe współrzędne z atlas picker
-                -legWidth * 0.6, -legHeight * 0.1,  // Offset od środka
+                50, 263, 40, 92,
+                -thighW/2, -thighH/2, thighW, thighH
+            );
+            ctx.restore();
+        } else {
+            ctx.drawImage(
+                this.characterAtlas,
+                50, 263, 40, 92,
+                x + this.width * 0.15 + leftLegX, legStartY + leftThighBendY,
+                legWidth, legHeight * 0.3
+            );
+        }
+
+        // LEFT SHIN with individual rotation
+        if (leftShinRotation !== 0) {
+            ctx.save();
+            const shinX = x + this.width * 0.15 + leftLegX + leftShinBendX;
+            const shinY = legStartY + legHeight * 0.3 + leftShinBendY;
+            const shinW = legWidth;
+            const shinH = legHeight * 0.3;
+            ctx.translate(shinX + shinW/2, shinY + shinH/2);
+            ctx.rotate(leftShinRotation);
+            ctx.drawImage(
+                this.characterAtlas,
+                43, 355, 53, 70,
+                -shinW/2, -shinH/2, shinW, shinH
+            );
+            ctx.restore();
+        } else {
+            ctx.drawImage(
+                this.characterAtlas,
+                43, 355, 53, 70,
+                x + this.width * 0.15 + leftLegX + leftShinBendX, legStartY + legHeight * 0.3 + leftShinBendY,
+                legWidth, legHeight * 0.3
+            );
+        }
+
+        // LEFT SHOE with individual rotation
+        if (leftShoeRotation !== 0) {
+            ctx.save();
+            const shoeX = x + this.width * 0.1 + leftLegX + leftShoeBendX;
+            const shoeY = legStartY + legHeight * 0.5 + leftShoeBendY;
+            ctx.translate(shoeX + legWidth * 0.6, shoeY + legHeight * 0.1);
+            ctx.rotate(leftShoeRotation);
+            ctx.drawImage(
+                this.characterAtlas,
+                31, 442, 62, 68,
+                -legWidth * 0.6, -legHeight * 0.1,
                 legWidth * 1.2, legHeight * 0.2
             );
             ctx.restore();
         } else {
             ctx.drawImage(
                 this.characterAtlas,
-                31, 442, 62, 68,  // L_SHOE - nowe współrzędne z atlas picker
-                x + this.width * 0.1 + leftLegX + shoeBendX, legStartY + legHeight * 0.5 + shoeBendY,
+                31, 442, 62, 68,
+                x + this.width * 0.1 + leftLegX + leftShoeBendX, legStartY + legHeight * 0.5 + leftShoeBendY,
                 legWidth * 1.2, legHeight * 0.2
             );
         }
 
-        // RIGHT THIGH - using coordinates from atlas picker
-        ctx.drawImage(
-            this.characterAtlas,
-            93, 261, 47, 97,  // R_THIGH - nowe współrzędne z atlas picker
-            x + this.width * 0.5 + rightLegX, legStartY + thighBendY,  // Uda z własnym offsetem
-            legWidth, legHeight * 0.3
-        );
-
-        // RIGHT SHIN - using coordinates from atlas picker (zginane do tyłu)
-        ctx.drawImage(
-            this.characterAtlas,
-            100, 361, 44, 64,  // R_SHIN - nowe współrzędne z atlas picker
-            x + this.width * 0.5 + rightLegX + shinBendX, legStartY + legHeight * 0.3 + shinBendY,  // Łydka do tyłu i do góry
-            legWidth, legHeight * 0.3
-        );
-
-        // RIGHT SHOE - using coordinates from atlas picker (z rotacją)
-        if (shoeRotation !== 0) {
+        // RIGHT THIGH with individual rotation
+        if (rightThighRotation !== 0) {
             ctx.save();
-            const shoeX = x + this.width * 0.45 + rightLegX + shoeBendX;
-            const shoeY = legStartY + legHeight * 0.5 + shoeBendY;
-            ctx.translate(shoeX + legWidth * 0.6, shoeY + legHeight * 0.1); // Środek buta
-            ctx.rotate(shoeRotation);
+            const thighX = x + this.width * 0.5 + rightLegX;
+            const thighY = legStartY + rightThighBendY;
+            const thighW = legWidth;
+            const thighH = legHeight * 0.3;
+            ctx.translate(thighX + thighW/2, thighY + thighH/2);
+            ctx.rotate(rightThighRotation);
             ctx.drawImage(
                 this.characterAtlas,
-                97, 446, 83, 57,  // R_SHOE - nowe współrzędne z atlas picker
-                -legWidth * 0.6, -legHeight * 0.1,  // Offset od środka
+                93, 261, 47, 97,
+                -thighW/2, -thighH/2, thighW, thighH
+            );
+            ctx.restore();
+        } else {
+            ctx.drawImage(
+                this.characterAtlas,
+                93, 261, 47, 97,
+                x + this.width * 0.5 + rightLegX, legStartY + rightThighBendY,
+                legWidth, legHeight * 0.3
+            );
+        }
+
+        // RIGHT SHIN with individual rotation
+        if (rightShinRotation !== 0) {
+            ctx.save();
+            const shinX = x + this.width * 0.5 + rightLegX + rightShinBendX;
+            const shinY = legStartY + legHeight * 0.3 + rightShinBendY;
+            const shinW = legWidth;
+            const shinH = legHeight * 0.3;
+            ctx.translate(shinX + shinW/2, shinY + shinH/2);
+            ctx.rotate(rightShinRotation);
+            ctx.drawImage(
+                this.characterAtlas,
+                100, 361, 44, 64,
+                -shinW/2, -shinH/2, shinW, shinH
+            );
+            ctx.restore();
+        } else {
+            ctx.drawImage(
+                this.characterAtlas,
+                100, 361, 44, 64,
+                x + this.width * 0.5 + rightLegX + rightShinBendX, legStartY + legHeight * 0.3 + rightShinBendY,
+                legWidth, legHeight * 0.3
+            );
+        }
+
+        // RIGHT SHOE with individual rotation
+        if (rightShoeRotation !== 0) {
+            ctx.save();
+            const shoeX = x + this.width * 0.45 + rightLegX + rightShoeBendX;
+            const shoeY = legStartY + legHeight * 0.5 + rightShoeBendY;
+            ctx.translate(shoeX + legWidth * 0.6, shoeY + legHeight * 0.1);
+            ctx.rotate(rightShoeRotation);
+            ctx.drawImage(
+                this.characterAtlas,
+                97, 446, 83, 57,
+                -legWidth * 0.6, -legHeight * 0.1,
                 legWidth * 1.2, legHeight * 0.2
             );
             ctx.restore();
         } else {
             ctx.drawImage(
                 this.characterAtlas,
-                97, 446, 83, 57,  // R_SHOE - nowe współrzędne z atlas picker
-                x + this.width * 0.45 + rightLegX + shoeBendX, legStartY + legHeight * 0.5 + shoeBendY,
+                97, 446, 83, 57,
+                x + this.width * 0.45 + rightLegX + rightShoeBendX, legStartY + legHeight * 0.5 + rightShoeBendY,
                 legWidth * 1.2, legHeight * 0.2
             );
         }
@@ -669,6 +833,20 @@ class Player {
 
     getDashCharges() {
         return this.dashCharges;
+    }
+    
+    takeDamage() {
+        if (this.isInvincible) return false; // Already invincible, no damage
+        
+        // Activate invincibility
+        this.isInvincible = true;
+        this.invincibilityTimer = this.invincibilityDuration;
+        
+        return true; // Damage taken
+    }
+    
+    isVulnerable() {
+        return !this.isInvincible;
     }
 
     addDashPower(amount) {
