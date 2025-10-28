@@ -1,202 +1,691 @@
 <!DOCTYPE html>
-<html lang='en'>
-
+<html lang="en">
 <head>
-	<meta charset='utf-8' />
-	<meta name='viewport' content='width=device-width, user-scalable=no' />
-	<title>bungvo</title>
-	<link rel="stylesheet" type="text/css" href="styles.css" />
-	<link id='-gd-engine-icon' rel='icon' type='image/png' href='index.icon.png' />
-	<link rel='apple-touch-icon' href='index.apple-touch-icon.png' />
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="theme-color" content="#667eea">
+    <title>Bungvo Enhanced - HTML5 Rewrite</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="assets/charatlas.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        
+        #gameContainer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+        }
+        
+        /* Mobile touch controls */
+        #touchControls {
+            display: none;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .touch-button {
+            position: absolute;
+            pointer-events: auto;
+            opacity: 0.6;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        
+        .touch-button:active {
+            opacity: 1;
+        }
+        
+        .touch-button img {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        #btnLeft {
+            bottom: 20px;
+            left: 20px;
+            width: 80px;
+            height: 80px;
+        }
+        
+        #btnRight {
+            bottom: 20px;
+            left: 120px;
+            width: 80px;
+            height: 80px;
+        }
+        
+        #btnJump {
+            bottom: 20px;
+            right: 120px;
+            width: 80px;
+            height: 80px;
+        }
+        
+        #btnDash {
+            bottom: 20px;
+            right: 20px;
+            width: 80px;
+            height: 80px;
+        }
+        
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: #1a1a2e;
+            touch-action: none;
+            object-fit: cover;
+        }
+        
+        /* Mobile - show touch controls and menu button */
+        @media (max-width: 767px) {
+            #touchControls {
+                display: block;
+            }
+            #mobileMenuBtn {
+                display: block !important;
+            }
+            
+            /* Zmniejsz UI na mobile */
+            #ui {
+                font-size: 10px !important;
+                transform: scale(0.7);
+                transform-origin: top left;
+            }
+            
+            #dashPowerContainer {
+                transform: scale(0.6) !important;
+                transform-origin: top left;
+                top: 10px !important;
+                left: 10px !important;
+            }
+            
+            #hpContainer {
+                transform: scale(0.6) !important;
+                transform-origin: top right;
+                top: 10px !important;
+                right: 10px !important;
+            }
+            
+            #controls {
+                font-size: 8px !important;
+                bottom: 5px !important;
+            }
+            
+            /* Zmniejsz weapon UI na mobile */
+            .weapon-ui {
+                transform: scale(0.7) !important;
+            }
+        }
+        
+        /* Desktop styling - also fullscreen */
+        @media (min-width: 768px) {
+            #gameCanvas {
+                width: 100% !important;
+                height: 100% !important;
+            }
+        }
+        
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            color: #00ffff;
+            font-size: 16px;
+            font-weight: bold;
+            font-family: 'Arial Black', Arial, sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 
+                0 0 10px #00ffff,
+                0 0 5px #00ffff,
+                2px 2px 0px #000;
+            z-index: 10;
+            background: linear-gradient(145deg, rgba(26, 26, 26, 0.8), rgba(45, 45, 45, 0.8));
+            padding: 12px 16px;
+            border: 1px solid #00ffff;
+            box-shadow: 
+                0 0 15px rgba(0, 255, 255, 0.3),
+                inset 0 0 15px rgba(0, 255, 255, 0.1);
+        }
+        
+        #ui div {
+            margin-bottom: 4px;
+        }
+        
+        #ui span {
+            color: #ff00ff;
+            text-shadow: 
+                0 0 8px #ff00ff,
+                0 0 4px #ff00ff;
+        }
+        
+        #menu {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.2) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.2) 0%, transparent 50%),
+                linear-gradient(135deg, rgba(12, 12, 12, 0.85) 0%, rgba(26, 26, 26, 0.9) 50%, rgba(15, 15, 15, 0.85) 100%);
+            backdrop-filter: blur(5px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 100;
+            font-family: 'Arial Black', Arial, sans-serif;
+        }
+        
+        #menu::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0, 255, 255, 0.03) 2px,
+                    rgba(0, 255, 255, 0.03) 4px
+                );
+            pointer-events: none;
+        }
+        
+        #menu h1 {
+            font-size: 64px;
+            margin-bottom: 40px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 8px;
+            color: #fff;
+            text-shadow: 
+                0 0 10px #00ffff,
+                0 0 20px #00ffff,
+                0 0 30px #00ffff,
+                0 0 40px #00ffff,
+                2px 2px 0px #000,
+                4px 4px 0px #333;
+            animation: neonFlicker 2s infinite alternate;
+            position: relative;
+        }
+        
+        @keyframes neonFlicker {
+            0%, 100% { 
+                text-shadow: 
+                    0 0 10px #00ffff,
+                    0 0 20px #00ffff,
+                    0 0 30px #00ffff,
+                    0 0 40px #00ffff,
+                    2px 2px 0px #000,
+                    4px 4px 0px #333;
+            }
+            50% { 
+                text-shadow: 
+                    0 0 5px #00ffff,
+                    0 0 10px #00ffff,
+                    0 0 15px #00ffff,
+                    0 0 20px #00ffff,
+                    2px 2px 0px #000,
+                    4px 4px 0px #333;
+            }
+        }
+        
+        .menu-button {
+            background: linear-gradient(145deg, #1a1a1a, #2d2d2d);
+            border: 2px solid #00ffff;
+            color: #00ffff;
+            padding: 18px 40px;
+            margin: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-radius: 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 
+                0 0 20px rgba(0, 255, 255, 0.3),
+                inset 0 0 20px rgba(0, 255, 255, 0.1),
+                0 4px 15px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: hidden;
+            font-family: 'Arial Black', Arial, sans-serif;
+        }
+        
+        .menu-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .menu-button:hover {
+            transform: translateY(-3px);
+            color: #fff;
+            background: linear-gradient(145deg, #2d2d2d, #1a1a1a);
+            border-color: #ff00ff;
+            box-shadow: 
+                0 0 30px rgba(255, 0, 255, 0.5),
+                inset 0 0 30px rgba(255, 0, 255, 0.1),
+                0 8px 25px rgba(0,0,0,0.6);
+            text-shadow: 0 0 10px #ff00ff;
+        }
+        
+        .menu-button:hover::before {
+            left: 100%;
+        }
+        
+        .menu-button:active {
+            transform: translateY(-1px);
+            box-shadow: 
+                0 0 20px rgba(255, 0, 255, 0.3),
+                inset 0 0 20px rgba(255, 0, 255, 0.2),
+                0 2px 10px rgba(0,0,0,0.4);
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            color: #00ffff;
+            font-size: 11px;
+            font-family: 'Arial', sans-serif;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            text-shadow: 
+                0 0 5px #00ffff,
+                1px 1px 0px #000;
+            background: linear-gradient(145deg, rgba(26, 26, 26, 0.7), rgba(45, 45, 45, 0.7));
+            padding: 8px 12px;
+            border: 1px solid #00ffff;
+            box-shadow: 
+                0 0 10px rgba(0, 255, 255, 0.2),
+                inset 0 0 10px rgba(0, 255, 255, 0.05);
+        }
+        
+        #dashPowerContainer {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: linear-gradient(145deg, rgba(26, 26, 26, 0.8), rgba(45, 45, 45, 0.8));
+            padding: 12px 16px;
+            border: 1px solid #ff00ff;
+            box-shadow: 
+                0 0 15px rgba(255, 0, 255, 0.3),
+                inset 0 0 15px rgba(255, 0, 255, 0.1);
+        }
+        
+        #dashPowerLabel {
+            color: #ff00ff;
+            font-size: 12px;
+            font-family: 'Arial Black', Arial, sans-serif;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 
+                0 0 8px #ff00ff,
+                0 0 4px #ff00ff,
+                1px 1px 0px #000;
+            margin-bottom: 6px;
+            text-align: right;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        #dashCharges {
+            font-size: 16px;
+            font-weight: bold;
+            color: #00ffff;
+            text-shadow: 
+                0 0 8px #00ffff,
+                0 0 4px #00ffff;
+            display: none;
+        }
+        
+        #dashCooldown {
+            width: 120px;
+            height: 8px;
+            background: #000;
+            border: 1px solid #ff00ff;
+            overflow: hidden;
+            box-shadow: 
+                0 0 10px rgba(255, 0, 255, 0.3),
+                inset 0 0 5px rgba(0, 0, 0, 0.5);
+        }
+        
+        #dashCooldownBar {
+            height: 100%;
+            background: linear-gradient(90deg, #ff00ff, #00ffff);
+            width: 0%;
+            transition: width 0.1s ease;
+            box-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        /* Gangster Settings Styles */
+        .settings-control {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: linear-gradient(145deg, #1a1a1a, #2d2d2d);
+            border: 1px solid #00ffff;
+            border-radius: 0;
+            margin-bottom: 15px;
+            box-shadow: 
+                0 0 15px rgba(0, 255, 255, 0.2),
+                inset 0 0 15px rgba(0, 255, 255, 0.05);
+        }
+        
+        .settings-control label {
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #00ffff;
+            text-shadow: 0 0 5px #00ffff;
+        }
+        
+        .settings-control input[type="range"] {
+            width: 150px;
+            height: 6px;
+            background: #333;
+            border-radius: 0;
+            outline: none;
+            border: 1px solid #00ffff;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+        
+        .settings-control input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(145deg, #00ffff, #0099cc);
+            border-radius: 0;
+            border: 2px solid #fff;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+        
+        .settings-control input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(145deg, #00ffff, #0099cc);
+            border-radius: 0;
+            border: 2px solid #fff;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+        
+        .settings-value {
+            min-width: 50px;
+            text-align: center;
+            background: #000;
+            color: #00ffff;
+            padding: 8px 12px;
+            border: 1px solid #00ffff;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            text-shadow: 0 0 5px #00ffff;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+    </style>
 </head>
-
 <body>
-	<canvas id='canvas'>
-		HTML5 canvas appears to be unsupported in the current browser.<br />
-		Please try updating or use a different browser.
-	</canvas>
-	<div id='status'>
-		<div id='status-progress' class='hidden' oncontextmenu='event.preventDefault();'>
-			<div id='status-progress-inner'></div>
-		</div>
-		<div id='status-indeterminate' class='hidden' oncontextmenu='event.preventDefault();'>
-			<div></div>
-			<div></div>
-			<div></div>
-			<div></div>
-			<div></div>
-			<div></div>
-			<div></div>
-			<div></div>
-		</div>
-		<div id='status-notice' class='godot hidden'></div>
-	</div>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="ui">
+            <div>Score: <span id="score">0</span></div>
+            <div>HP: <span id="lives">100/100</span></div>
+            <div>Coins: <span id="coins">0</span></div>
+        </div>
+        
+        <div id="dashPowerContainer">
+            <div id="dashPowerLabel">
+                <span>DASH POWER</span>
+                <span id="dashCharges" style="display: none;">x0</span>
+            </div>
+            <div id="dashCooldown">
+                <div id="dashCooldownBar"></div>
+            </div>
+        </div>
+        
+        <!-- HP Bar - przeniesiony na prawą stronę -->
+        <div id="hpContainer" style="position: absolute; top: 15px; right: 15px; width: 200px; z-index: 10;">
+            <div id="hpLabel" style="color: #ff0066; font-size: 12px; font-weight: bold; margin-bottom: 5px; text-shadow: 0 0 5px #ff0066; text-align: right;">
+                <span>HEALTH</span>
+            </div>
+            <div id="hpBar" style="width: 100%; height: 12px; background: rgba(0, 0, 0, 0.7); border: 2px solid #ff0066; box-shadow: 0 0 10px rgba(255, 0, 102, 0.3);">
+                <div id="hpBarFill" style="width: 100%; height: 100%; background: linear-gradient(90deg, #ff0066, #ff6600); box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.3);"></div>
+            </div>
+        </div>
+        
+        <div id="controls">
+            Controls: W/Space - Jump | A/D - Move | Shift - Dash | X/Z/LMB - Shoot | R - Reload | ESC - Menu
+        </div>
+        
+        <!-- Mobile menu button -->
+        <button id="mobileMenuBtn" style="display: none; position: absolute; top: 15px; right: 15px; background: linear-gradient(145deg, #1a1a1a, #2d2d2d); color: #00ffff; border: 2px solid #00ffff; padding: 12px 16px; font-size: 18px; font-weight: bold; z-index: 50; box-shadow: 0 0 15px rgba(0, 255, 255, 0.3); text-shadow: 0 0 5px #00ffff;" onclick="toggleMobileMenu()">☰</button>
+        
+        <div id="menu">
+            <h1>BUNGVO</h1>
+            <p style="font-size: 20px; margin-bottom: 40px; color: #ff00ff; text-transform: uppercase; letter-spacing: 3px; font-weight: bold; text-shadow: 0 0 10px #ff00ff;">🔫 STREET EDITION 🔫</p>
+            <button class="menu-button" onclick="startGame()">Start Game</button>
+            <button class="menu-button" onclick="showInstructions()">How to Play</button>
+            <button class="menu-button" onclick="showSettings()">Settings</button>
+            <div style="margin-top: 30px; font-size: 18px; color: #00ffff; text-shadow: 0 0 5px #00ffff;">
+                💰 HIGH SCORE: <span id="highScore" style="color: #ff00ff; text-shadow: 0 0 5px #ff00ff; font-weight: bold;">0</span>
+            </div>
+            <div style="margin-top: 15px; font-size: 12px; opacity: 0.6; color: #666; text-transform: uppercase; letter-spacing: 1px;">
+                🎮 POWERED BY STREET TECH 🎮
+            </div>
+        </div>
+        
+        <!-- Settings Menu -->
+        <div id="settingsMenu" class="hidden" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 50%, #0f0f0f 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 101; font-family: 'Arial Black', Arial, sans-serif;">
+            <h2 style="font-size: 42px; margin-bottom: 40px; font-weight: 900; text-transform: uppercase; letter-spacing: 4px; color: #00ffff; text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 2px 2px 0px #000;">⚙️ SETTINGS</h2>
+            
+            <div style="display: flex; flex-direction: column; min-width: 450px;">
+                <div class="settings-control">
+                    <label>🎯 Mouse Sensitivity:</label>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <input type="range" id="mouseSensitivity" min="0.1" max="3.0" step="0.1" value="1.0">
+                        <span id="mouseSensitivityValue" class="settings-value">1.0</span>
+                    </div>
+                </div>
+                
+                <div class="settings-control">
+                    <label>🎮 Gamepad Sensitivity:</label>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <input type="range" id="gamepadSensitivity" min="0.1" max="3.0" step="0.1" value="1.0">
+                        <span id="gamepadSensitivityValue" class="settings-value">1.0</span>
+                    </div>
+                </div>
+                
+                <div class="settings-control">
+                    <label>🔍 Browser Zoom:</label>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <input type="range" id="browserZoom" min="0.5" max="2.0" step="0.1" value="1.0">
+                        <span id="browserZoomValue" class="settings-value">1.0</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; display: flex; gap: 20px;">
+                <button class="menu-button" onclick="saveSettings()">Save</button>
+                <button class="menu-button" onclick="resetSettings()">Reset</button>
+                <button class="menu-button" onclick="closeSettings()">Back</button>
+            </div>
+        </div>
+        
+        <!-- Mobile touch controls -->
+        <div id="touchControls">
+            <div id="btnLeft" class="touch-button">
+                <img src="assets/5213358-middle.png" style="transform: rotate(180deg);" alt="Left">
+            </div>
+            <div id="btnRight" class="touch-button">
+                <img src="assets/5213358-middle.png" alt="Right">
+            </div>
+            <div id="btnJump" class="touch-button">
+                <img src="assets/5213358-middle.png" style="transform: rotate(90deg);" alt="Jump">
+            </div>
+            <div id="btnDash" class="touch-button">
+                <img src="assets/5213358-middle.png" style="transform: rotate(-90deg);" alt="Dash">
+            </div>
+        </div>
+    </div>
 
-	<script src='index.js'></script>
-	<script>
-		const GODOT_CONFIG = { "args": [], "canvasResizePolicy": 2, "executable": "index", "experimentalVK": false, "fileSizes": { "index.pck": 2203552, "index.wasm": 17860295 }, "focusCanvas": true, "gdnativeLibs": [] };
-		var engine = new Engine(GODOT_CONFIG);
-
-		(function () {
-			const INDETERMINATE_STATUS_STEP_MS = 100;
-			var statusProgress = document.getElementById('status-progress');
-			var statusProgressInner = document.getElementById('status-progress-inner');
-			var statusIndeterminate = document.getElementById('status-indeterminate');
-			var statusNotice = document.getElementById('status-notice');
-
-			var initializing = true;
-			var statusMode = 'hidden';
-
-			var animationCallbacks = [];
-			function animate(time) {
-				animationCallbacks.forEach(callback => callback(time));
-				requestAnimationFrame(animate);
-			}
-			requestAnimationFrame(animate);
-
-			function setStatusMode(mode) {
-
-				if (statusMode === mode || !initializing)
-					return;
-				[statusProgress, statusIndeterminate, statusNotice].forEach(elem => {
-					elem.classList.add('hidden');
-				});
-				animationCallbacks = animationCallbacks.filter(function (value) {
-					return (value !== animateStatusIndeterminate);
-				});
-				switch (mode) {
-					case 'progress':
-						statusProgress.classList.remove('hidden');
-						break;
-					case 'indeterminate':
-						statusIndeterminate.classList.remove('hidden');
-						animationCallbacks.push(animateStatusIndeterminate);
-						break;
-					case 'notice':
-						statusNotice.classList.remove('hidden');
-						break;
-					case 'hidden':
-						break;
-					default:
-						throw new Error('Invalid status mode');
-				}
-				statusMode = mode;
-			}
-
-			function animateStatusIndeterminate(ms) {
-				var i = Math.floor(ms / INDETERMINATE_STATUS_STEP_MS % 8);
-				if (statusIndeterminate.children[i].style.borderTopColor === '') {
-					Array.prototype.slice.call(statusIndeterminate.children).forEach(child => {
-						child.style.borderTopColor = '';
-					});
-					statusIndeterminate.children[i].style.borderTopColor = 'var(--spinner-active-color)';
-				}
-			}
-
-			function setStatusNotice(text) {
-				while (statusNotice.lastChild) {
-					statusNotice.removeChild(statusNotice.lastChild);
-				}
-				var lines = text.split('\n');
-				lines.forEach((line) => {
-					statusNotice.appendChild(document.createTextNode(line));
-					statusNotice.appendChild(document.createElement('br'));
-				});
-			};
-
-			function displayFailureNotice(err) {
-				var msg = err.message || err;
-				console.error(msg);
-				setStatusNotice(msg);
-				setStatusMode('notice');
-				initializing = false;
-			};
-
-			// Resource validation functions
-			function validateResourceExists(url) {
-				return fetch(url, { method: 'HEAD' })
-					.then(response => {
-						if (!response.ok) {
-							throw new Error(`Resource not found: ${url} (${response.status})`);
-						}
-						return true;
-					})
-					.catch(error => {
-						// Handle network errors and CORS issues
-						if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-							throw new Error(`Network error loading ${url}. Please check your internet connection or server configuration.`);
-						}
-						throw error;
-					});
-			}
-
-			function validateGameResources() {
-				const requiredResources = [
-					{ file: 'index.wasm', description: 'WebAssembly game engine' },
-					{ file: 'index.pck', description: 'Game data package' }
-				];
-
-				setStatusMode('indeterminate');
-
-				const validationPromises = requiredResources.map(resource =>
-					validateResourceExists(resource.file)
-						.catch(error => {
-							throw new Error(`Failed to load ${resource.description} (${resource.file}):\n${error.message}`);
-						})
-				);
-
-				return Promise.all(validationPromises);
-			}
-
-			function startGameWithValidation() {
-				return validateGameResources()
-					.then(() => {
-						// Resources validated, proceed with game loading
-						return engine.startGame({
-							'onProgress': function (current, total) {
-								if (total > 0) {
-									statusProgressInner.style.width = current / total * 100 + '%';
-									setStatusMode('progress');
-									if (current === total) {
-										// wait for progress bar animation
-										setTimeout(() => {
-											setStatusMode('indeterminate');
-										}, 500);
-									}
-								} else {
-									setStatusMode('indeterminate');
-								}
-							},
-						});
-					})
-					.then(() => {
-						setStatusMode('hidden');
-						initializing = false;
-					})
-					.catch(error => {
-						// Enhanced error messages for common issues
-						let errorMessage = error.message || error;
-
-						if (errorMessage.includes('index.wasm')) {
-							errorMessage += '\n\nThis usually means:\n• The WebAssembly file is missing from the server\n• There\'s a network connectivity issue\n• The server is not configured to serve .wasm files';
-						} else if (errorMessage.includes('index.pck')) {
-							errorMessage += '\n\nThis usually means:\n• The game data file is missing from the server\n• There\'s a network connectivity issue\n• The file was not uploaded correctly';
-						} else if (errorMessage.includes('Network error')) {
-							errorMessage += '\n\nPlease try:\n• Refreshing the page\n• Checking your internet connection\n• Contacting the site administrator if the problem persists';
-						}
-
-						displayFailureNotice(errorMessage);
-					});
-			}
-
-			if (!Engine.isWebGLAvailable()) {
-				displayFailureNotice('WebGL not available');
-			} else {
-				startGameWithValidation();
-			}
-		})();
-	</script>
+    <script src="js/game.js"></script>
+    <script src="js/obstacles.js?v=8"></script>
+    <script src="js/enemies.js"></script>
+    <script src="js/weapons.js"></script>
+    <script src="js/player.js?v=3"></script>
+    <script src="js/world.js?v=5"></script>
+    <script src="js/physics.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/gamepad.js"></script>
+    <script src="js/fullscreen.js"></script>
+    <script src="js/settings.js"></script>
+    <script src="js/touch.js"></script>
+    <script src="js/main.js?v=5"></script>
+    
+    <script>
+        // Setup responsive canvas - fullscreen with proper scaling
+        function setupCanvas() {
+            const canvas = document.getElementById('gameCanvas');
+            
+            // Use actual screen dimensions
+            const screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            const screenHeight = window.innerHeight || document.documentElement.clientHeight;
+            
+            // For PWA, use 1:1 pixel ratio to avoid zoom issues
+            const dpr = 1; // Fixed DPR to prevent zoom issues on PWA
+            
+            // Set canvas to screen size
+            canvas.width = screenWidth * dpr;
+            canvas.height = screenHeight * dpr;
+            
+            // Ensure canvas CSS size matches screen
+            canvas.style.width = screenWidth + 'px';
+            canvas.style.height = screenHeight + 'px';
+            
+            console.log(`Canvas: ${canvas.width}x${canvas.height} (DPR: ${dpr}, Screen: ${screenWidth}x${screenHeight})`);
+        }
+        
+        // Setup canvas before game starts
+        setupCanvas();
+        
+        // Setup touch controls for mobile
+        function setupTouchControls() {
+            const isMobile = window.innerWidth < 768;
+            if (!isMobile) return;
+            
+            const touchButtons = {
+                btnLeft: 'KeyA',
+                btnRight: 'KeyD',
+                btnJump: 'Space',
+                btnDash: 'ShiftLeft'
+            };
+            
+            Object.keys(touchButtons).forEach(btnId => {
+                const btn = document.getElementById(btnId);
+                const keyCode = touchButtons[btnId];
+                
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (window.game && window.game.keys) {
+                        window.game.keys[keyCode] = true;
+                    }
+                });
+                
+                btn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    if (window.game && window.game.keys) {
+                        window.game.keys[keyCode] = false;
+                    }
+                });
+                
+                btn.addEventListener('touchcancel', (e) => {
+                    e.preventDefault();
+                    if (window.game && window.game.keys) {
+                        window.game.keys[keyCode] = false;
+                    }
+                });
+            });
+        }
+        
+        // Setup touch controls after page loads
+        window.addEventListener('load', setupTouchControls);
+        
+        // Handle orientation change on mobile
+        window.addEventListener('resize', () => {
+            setupCanvas();
+            // Reload game with new dimensions if needed
+            if (window.game) {
+                location.reload();
+            }
+        });
+        
+        // Register service worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registered:', registration.scope);
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed:', err);
+                    });
+            });
+        }
+    </script>
 </body>
-
 </html>

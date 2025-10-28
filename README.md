@@ -1,229 +1,229 @@
-# 🎮 Bungvo - Walking Simulator Game
+# 🚶 Bungvo - Sidewalk Walking Game
 
-Spokojny symulator chodzenia po chodniku z systemem parallax scrolling. Projekt dostępny w dwóch wersjach: oryginalnej (Godot Engine) i przepisanej (HTML5/JavaScript).
+Przepisana wersja oryginalnej gry "Bungvo" - spokojnej gry o chodzeniu po chodniku, w HTML5/JavaScript z Canvas API, używająca oryginalnych assetów z wersji Godot.
 
-## 📦 Wersje Projektu
+## ✨ Funkcje Enhanced Edition
 
-### 🎯 Wersja Godot (Główna - Web Export)
-**Lokalizacja:** Root directory (`index.html`, `index.wasm`, `index.pck`)
+### 🎯 Oryginalne assety + ulepszone mechaniki
+- **Oryginalne tekstury** - wszystkie sprite'y z wersji Godot
+- **Oryginalny character atlas** - animowany bohater
+- **Oryginalne tła** - niebo, chmury, elementy parallax
+- **Oryginalne platformy** - tekstury bloków i ogrodzeń
+- **Jumping** - płynny skok z grawitacją
+- **Dash** - szybki ruch w dowolnym kierunku z cooldownem (1s)
+- **Coyote time** - krótki czas na skok po opuszczeniu platformy (0.1s)
+- **Jump buffering** - buforowanie skoku dla lepszej responsywności (0.1s)
 
-Wyeksportowana wersja gry z Godot Engine 4.5.1 gotowa do uruchomienia w przeglądarce.
+### 🏆 System punktów
+- Zbieranie monet (używa oryginalnych sprite'ów)
+- Zapisywanie najlepszego wyniku
+- Bonus za ukończenie poziomu
 
-**Uruchomienie:**
-```bash
-# Wymaga lokalnego serwera HTTP
-python -m http.server 8000
-# Otwórz: http://localhost:8000
-```
+### 🎨 Wierny oryginałowi wygląd
+- Oryginalne tekstury i sprite'y
+- Zachowana estetyka gry Bungvo
+- Płynne animacje i efekty
+- Responsywny design
 
-**Funkcje:**
-- ✅ Pełna gra w WebAssembly
-- ✅ Wszystkie oryginalne assety
-- ✅ Optymalizowana wydajność
-- ✅ Walidacja zasobów przed ładowaniem
-- ✅ Responsywny design
-
-**Pliki:**
-- `index.html` - Główny plik HTML z ulepszoną obsługą błędów
-- `index.wasm` - Skompilowana gra (17.8MB)
-- `index.pck` - Spakowane dane gry (2.2MB)
-- `index.js` - Runtime Godot
-- `styles.css` - Zewnętrzny CSS z custom properties
-- `index.audio.worklet.js` - Procesor audio
-
-### 🔄 Wersja JavaScript (Rewrite)
-**Lokalizacja:** `bungvo_rewrite/`
-
-Kompletnie przepisana wersja w czystym HTML5/JavaScript używająca oryginalnych assetów.
-
-**Uruchomienie:**
-```bash
-cd bungvo_rewrite
-python -m http.server 8000
-# Otwórz: http://localhost:8000
-```
-
-**Funkcje:**
-- ✅ Platformer mechanics (skok, dash)
-- ✅ Enhanced movement (coyote time, jump buffering)
-- ✅ Camera follow system z dead zone (200px)
-- ✅ Swobodny ruch po całym ekranie
-- ✅ Multi-layer parallax (niebo, budynki, drzewa, ogrodzenie)
-- ✅ Niezależny system chmur
-- ✅ Zbieranie monet (oblck.png)
-- ✅ System zapisywania high score
-- ✅ Dash z cooldownem i wizualnym wskaźnikiem
-
-**Struktura:**
-```
-bungvo_rewrite/
-├── index.html              # Główna gra
-├── js/
-│   ├── main.js            # Główna pętla gry
-│   ├── player.js          # Mechaniki gracza
-│   ├── world.js           # System świata i parallax
-│   ├── physics.js         # Fizyka i kolizje
-│   ├── ui.js              # Interfejs użytkownika
-│   └── game.js            # Systemy gry
-├── assets/                # Oryginalne tekstury z Godot
-└── README.md              # Szczegółowa dokumentacja
-```
-
-**Pliki testowe:**
-- `test_assets.html` - Test ładowania assetów
-- `bidirectional_test.html` - Test kierunków ruchu
-- `controlled_scroll_test.html` - Test scrollowania
-- `infinite_runner_test.html` - Test mechaniki
-- `bigger_scale_test.html` - Test skali
-- `position_test.html` - Test pozycjonowania
-- `original_layout_test.html` - Test layoutu
-
-## 🛠️ Projekt Źródłowy Godot
-**Lokalizacja:** `godot_project/`
-
-Źródłowe pliki projektu Godot do edycji i eksportu.
-
-**Wymagania:**
-- Godot Engine 4.5.1 lub nowszy
-
-**Instrukcje:**
-Zobacz `godot_project/INSTRUKCJA_URUCHOMIENIA.md`
-
-## 🧪 Testowanie
-
-### Test Suite (Root)
-Kompleksowy zestaw testów dla wersji Godot:
-- `test-suite.html` - Pełny zestaw testów
-- `cross-browser-test.html` - Testy kompatybilności
-- `responsive-design-test.html` - Testy responsywności
-- `visual-regression-test.html` - Testy wizualne
-
-**Uruchomienie:**
-```bash
-python -m http.server 8000
-# Otwórz: http://localhost:8000/test-suite.html
-```
-
-## 📋 Narzędzia
-
-### Export Scripts
-**Lokalizacja:** `export_scripts/`
-- `export_to_web.py` - Automatyczny eksport do web
-
-### WASM Tools
-**Lokalizacja:** `wasm_tools/`
-- `wasm_patcher.py` - Narzędzia do modyfikacji WASM
+### 🔧 Nowoczesna architektura
+- Czysty HTML5/JavaScript
+- Modularny kod
+- System fizyki z kolizjami
+- Zarządzanie stanów gry
 
 ## 🎮 Kontrolki
 
-### Wersja Godot
-- **Strzałki/WASD** - Ruch
-- **Spacja** - Akcja
-- **ESC** - Menu/Pauza
-
-### Wersja JavaScript
+- **A/D** lub **Strzałki** - Ruch lewo/prawo
 - **W/Space/↑** - Skok
-- **A/←** - Ruch w lewo
-- **D/→** - Ruch w prawo
-- **Shift** - Dash (z cooldownem)
-- **ESC** - Menu/Pauza
+- **Shift** - Dash (z cooldownem 1s)
+- **ESC** - Pauza/Menu
 
-## 🌐 Kompatybilność Przeglądarek
+## 🎨 Oryginalne assety
 
-Obie wersje wymagają:
-- ✅ WebGL support
-- ✅ WebAssembly support (wersja Godot)
-- ✅ Modern JavaScript (ES6+)
-- ✅ WebAudio API support
+Ta wersja używa wszystkich oryginalnych tekstur wyekstraktowanych z pliku `.pck` Godot:
 
-Testowane na:
-- Chrome/Chromium 90+
-- Firefox 88+
-- Safari 14+
-- Edge 90+
+- **charatlas.png** - Kompletny atlas postaci z głową, torsem, nogami
+- **nieb.png** - Tekstura tła nieba
+- **oblockmid.png** - Tekstura platform środkowych
+- **oblockfence.png** - Tekstura ścian/ogrodzeń
+- **Pv8HBC.png** - Sprite'y chmur
+- **download.png** - Elementy tła
+- **id2.png** - Tekstura monet/przedmiotów
+- **oblck.png** - Dodatkowe bloki
 
-## 📊 Struktura Projektu
+Wszystkie tekstury są automatycznie ładowane i używane w odpowiednich miejscach.
 
-```
-/
-├── index.html                  # Główna gra Godot (web export)
-├── index.wasm                  # WebAssembly binary (17.8MB)
-├── index.pck                   # Godot packed data (2.2MB)
-├── index.js                    # Godot runtime
-├── styles.css                  # Zewnętrzny CSS
-├── test-suite.html             # Kompleksowe testy
-├── README.md                   # Ten plik
-│
-├── bungvo_rewrite/             # Przepisana wersja JavaScript
-│   ├── index.html
-│   ├── js/                     # Modularny kod
-│   ├── assets/                 # Oryginalne tekstury
-│   └── README.md               # Dokumentacja JS version
-│
-├── godot_project/              # Źródła Godot
-│   ├── project.godot
-│   ├── *.gd                    # Skrypty GDScript
-│   └── INSTRUKCJA_URUCHOMIENIA.md
-│
-├── export_scripts/             # Skrypty eksportu
-├── wasm_tools/                 # Narzędzia WASM
-└── .kiro/                      # Konfiguracja IDE
-    └── specs/                  # Specyfikacje ulepszeń
-```
+## 🚀 Jak uruchomić
 
-## 🚀 Quick Start
+### Opcja 1: Bezpośrednio w przeglądarce
+1. Upewnij się, że folder `assets/` zawiera wszystkie tekstury
+2. Otwórz plik `index.html` w przeglądarce
+3. Graj!
 
-### Uruchom wersję Godot (zalecane):
+### Opcja 2: Lokalny serwer (zalecane dla pełnej funkcjonalności)
 ```bash
+# Python 3
 python -m http.server 8000
-# Otwórz: http://localhost:8000
+
+# Python 2
+python -m SimpleHTTPServer 8000
+
+# Node.js
+npx http-server
 ```
 
-### Uruchom wersję JavaScript:
+Następnie otwórz http://localhost:8000
+
+### Opcja 3: Kopiowanie assetów (jeśli nie masz folderu assets)
 ```bash
-cd bungvo_rewrite
-python -m http.server 8000
-# Otwórz: http://localhost:8000
+python copy_assets.py
 ```
 
-### Edytuj w Godot:
-```bash
-# Otwórz Godot Engine 4.5.1
-# File -> Open Project -> godot_project/project.godot
+## 📁 Struktura projektu
+
+```
+bungvo_rewrite/
+├── index.html          # Główny plik HTML
+├── assets/             # Oryginalne tekstury z Godot
+│   ├── charatlas.png   # Atlas postaci
+│   ├── nieb.png        # Tło nieba
+│   ├── oblockmid.png   # Tekstura platform
+│   ├── oblockfence.png # Tekstura ścian
+│   ├── Pv8HBC.png      # Chmury
+│   ├── id2.png         # Monety
+│   └── ...             # Inne tekstury
+├── js/
+│   ├── main.js         # Główna pętla gry i inicjalizacja
+│   ├── player.js       # Mechaniki gracza (z oryginalnym atlasem)
+│   ├── world.js        # Świat gry (z oryginalnymi teksturami)
+│   ├── physics.js      # System fizyki i kolizji
+│   ├── ui.js          # Interfejs użytkownika i efekty
+│   └── game.js        # Systemy gry
+├── copy_assets.py      # Skrypt do kopiowania assetów
+└── README.md          # Ten plik
 ```
 
-## 📝 Changelog
+## 🎯 Mechaniki gry
 
-### Wersja Godot (Aktualna)
-- ✅ Modernizacja HTML5 (usunięcie CDATA)
-- ✅ Zewnętrzny CSS z custom properties
-- ✅ Strict equality operators
-- ✅ Walidacja zasobów przed ładowaniem
-- ✅ Ulepszona obsługa błędów
-- ✅ Kompleksowy test suite
+### Camera Follow System
+1. Gracz może się poruszać swobodnie po całym ekranie
+2. Dead zone 200px w centrum - kamera nie rusza się
+3. Gdy gracz wyjdzie poza dead zone - kamera zaczyna go śledzić
+4. Płynne śledzenie - im dalej od centrum, tym szybsze scrollowanie
+5. Możesz "wyprzedzić" kamerę używając dash'a
 
-### Wersja JavaScript (Rewrite)
-- ✅ Kompletna implementacja w JS
-- ✅ Platformer mechanics (skok, dash)
-- ✅ Enhanced movement (coyote time, jump buffering)
-- ✅ Camera follow system z dead zone
-- ✅ Multi-layer parallax scrolling
-- ✅ Niezależny system chmur
-- ✅ System zbierania monet (oblck.png)
-- ✅ Dash z cooldownem
+### Dash
+1. Naciśnij Shift + kierunek (WASD/strzałki)
+2. Bez kierunku - dash w stronę patrzenia
+3. Cooldown 1 sekunda (wskaźnik w prawym górnym rogu)
+4. Odnawia się na ziemi i przy ścianie
 
-## 🤝 Rozwój
+### Coyote Time
+- Możesz skoczyć przez 0.1s po opuszczeniu platformy
+- Czyni grę bardziej responsywną i przyjazną
 
-Projekt używa:
-- **Godot Engine 4.5.1** - główny silnik gry
-- **HTML5/Canvas API** - wersja JavaScript
-- **WebAssembly** - kompilacja Godot
-- **Python** - skrypty narzędziowe
+## 🏆 Osiągnięcia
+
+- **First Steps** - Zbierz pierwszą monetę
+- **Coin Collector** - Zbierz 10 monet w jednej grze
+- **Wall Jumper** - Wykonaj 5 wall jumpów
+- **Dash Master** - Użyj dash 20 razy
+- **Speed Runner** - Ukończ poziom w mniej niż 30 sekund
+
+## 🔧 Customizacja
+
+### Zmiana parametrów gracza
+W pliku `js/player.js`:
+```javascript
+this.speed = 250;        // Prędkość ruchu
+this.jumpPower = 450;    // Siła skoku
+this.dashSpeed = 400;    // Prędkość dash'a
+this.gravity = 980;      // Grawitacja
+```
+
+### Dodanie nowych poziomów
+W pliku `js/world.js` w metodzie `generateLevel()`:
+```javascript
+// Dodaj platformy
+this.addPlatform(x, y, width, height);
+
+// Dodaj ściany
+this.addWall(x, y, width, height, {x: -1, y: 0});
+
+// Dodaj monety
+this.addCoin(x, y);
+```
+
+### Nowe osiągnięcia
+W pliku `js/game.js` w klasie `AchievementSystem`:
+```javascript
+NEW_ACHIEVEMENT: {
+    id: 'new_achievement',
+    name: 'Nazwa',
+    description: 'Opis',
+    unlocked: false
+}
+```
+
+## 🎨 Style i kolory
+
+Gra używa nowoczesnych gradientów CSS i Canvas:
+- **Tło**: Gradient niebieski → fioletowy
+- **Gracz**: Teal (#4ecdc4), czerwony podczas dash'a
+- **Platformy**: Brązowe gradienty
+- **Monety**: Złote z animacją obrotu
+- **UI**: Białe z cieniami
+
+## 🔊 Dźwięki (do implementacji)
+
+Struktura jest przygotowana na dodanie dźwięków:
+- Skok gracza
+- Dash
+- Zbieranie monet
+- Muzyka tła
+- Efekty UI
+
+## 📱 Kompatybilność
+
+- ✅ Chrome/Chromium
+- ✅ Firefox
+- ✅ Safari
+- ✅ Edge
+- ✅ Mobile browsers (z touch controlami)
+
+## 🐛 Znane problemy
+
+- Brak dźwięków (do implementacji)
+- Jeden poziom (łatwo dodać więcej)
+- Brak animacji sprite'ów (używa prostych kształtów)
+
+## 🚀 Dalszy rozwój
+
+### Planowane funkcje:
+1. **Więcej poziomów** - system ładowania poziomów
+2. **Dźwięki** - pełna implementacja audio
+3. **Animacje** - sprite'y i animacje postaci
+4. **Wrogowie** - przeciwnicy i walka
+5. **Power-up'y** - tymczasowe ulepszenia
+6. **Multiplayer** - tryb dla wielu graczy
+7. **Level editor** - tworzenie własnych poziomów
+
+### Jak dodać nowe funkcje:
+1. **Nowe mechaniki** - rozszerz klasę `Player`
+2. **Nowe obiekty** - dodaj do klasy `World`
+3. **Nowe efekty** - użyj klasy `UI`
+4. **Nowe stany** - rozszerz `GameState`
 
 ## 📄 Licencja
 
-Open source - możesz swobodnie modyfikować i dystrybuować.
+Ten projekt jest open source. Możesz go swobodnie modyfikować i dystrybuować.
+
+## 🎉 Gotowe!
+
+Masz teraz kompletną, działającą grę platformową z zaawansowanymi mechanikami!
+
+**Miłej zabawy!** 🚀
 
 ---
 
-**Bungvo** - Spokojny spacer po chodniku 🚶‍♂️
+*Bungvo Enhanced - HTML5 Rewrite v1.0*

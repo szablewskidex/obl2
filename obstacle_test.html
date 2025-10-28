@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obstacle System Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #1a1a2e;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        #gameCanvas {
+            border: 2px solid #333;
+            background: #0f0f23;
+            display: block;
+            margin: 20px auto;
+        }
+
+        .controls {
+            text-align: center;
+            margin: 20px;
+        }
+
+        .info {
+            text-align: center;
+            margin: 10px;
+            font-size: 14px;
+        }
+
+        button {
+            background: #667eea;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #764ba2;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Obstacle System Test</h1>
+    <div class="info">
+        <p>Test różnych typów przeszkód i ich kolizji z graczem</p>
+        <p>Sterowanie: A/D - ruch, W/Space - skok, Shift - dash</p>
+    </div>
+
+    <canvas id="gameCanvas" width="1024" height="400"></canvas>
+
+    <div class="controls">
+        <button onclick="spawnObstacle('block')">Spawn Block</button>
+        <button onclick="spawnObstacle('tall_block')">Spawn Tall Block</button>
+        <button onclick="spawnObstacle('fence')">Spawn Fence</button>
+        <button onclick="spawnObstacle('platform')">Spawn Platform</button>
+        <button onclick="spawnObstacle('police_car')">Spawn Police Car</button>
+        <button onclick="clearObstacles()">Clear All</button>
+    </div>
+
+    <div class="info">
+        <p id="status">Status: Ready</p>
+        <p id="collisionInfo">Collisions: None</p>
+    </div>
+
+    <script src="js/game.js"></script>
+    <script src="js/obstacles.js"></script>
+    <script src="js/physics.js"></script>
+
+    <script>
+        // Simple test setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Load textures
+        const textures = {};
+        const textureList = ['oblck', 'oblckclck', 'oblockfence', 'platform', 'police_car'];
+        let texturesLoaded = 0;
+
+        textureList.forEach(textureName => {
+            const img = new Image();
+            img.onload = () => {
+                texturesLoaded++;
+                console.log(`Loaded: ${textureName}`);
+            };
+            img.onerror = () => {
+                console.error(`Failed to load: ${textureName}`);
+                texturesLoaded++; // Count as loaded to prevent hanging
+            };
+            img.src = `assets/${textureName}.png`;
+            textures[textureName] = img;
+        });
+
+        // Simple player for testing
+        const player = {
+            x: 100,
+            y: canvas.height - 100,
+            width: 40,
+            height: 80,
+            velocityX: 0,
+            velocityY: 0,
+            speed: 200,
+            jumpPower: 400,
+            gravity: 800,
+            onGround: false,
+            isDashing: false,
+            dashTimer: 0,
+
+            getRect() {
+                return {
+                    x: this.x,
+                    y: this.y,
+                    width: this.width,
+                    height: this.height
+                };
+            }
+        };
+
+        // Obstacle manager
+        const obstacleManager = new ObstacleManager(canvas.height);
+
+        // Input handling
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            e.preventDefault();
+        });
+        document.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        // Game loop
+        let lastTime = 0;
+        function gameLoop(currentTime) {
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+
+            update(deltaTime);
+            render();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update(deltaTime) {
+            // Update player
+            let moveDirection = 0;
+            if (keys['KeyA'] || keys['ArrowLeft']) moveDirection = -1;
+            if (keys['KeyD'] || keys['ArrowRight']) moveDirection = 1;
+
+            player.velocityX = moveDirection * player.speed;
+
+            // Jump
+            if ((keys['KeyW'] || keys['Space']) && player.onGround) {
+                player.velocityY = -player.jumpPower;
+                player.onGround = false;
+            }
+
+            // Dash
+            if (keys['ShiftLeft'] && !player.isDashing) {
+                player.isDashing = true;
+                player.dashTimer = 0.3;
+                player.velocityX = moveDirection * 400;
+            }
+
+            // Update dash
+            if (player.dashTimer > 0) {
+                player.dashTimer -= deltaTime;
+                if (player.dashTimer <= 0) {
+                    player.isDashing = false;
+                }
+            }
+
+            // Apply physics
+            if (!player.onGround) {
+                player.velocityY += player.gravity * deltaTime;
+            }
+
+            player.x += player.velocityX * deltaTime;
+            player.y += player.velocityY * deltaTime;
+
+            // Ground collision
+            const groundY = canvas.height - 20;
+            if (player.y + player.height >= groundY) {
+                player.y = groundY - player.height;
+                player.velocityY = 0;
+                player.onGround = true;
+            } else {
+                player.onGround = false;
+            }
+
+            // Keep in bounds
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+
+            // Update obstacles
+            obstacleManager.update(deltaTime, 0, 0, canvas.width);
+
+            // Check collisions
+            const collisions = obstacleManager.checkCollisions(player);
+            if (collisions.length > 0) {
+                const obstacle = collisions[0];
+                document.getElementById('collisionInfo').textContent =
+                    `Collision with: ${obstacle.type}`;
+
+                if (player.isDashing && (obstacle.type === 'block' || obstacle.type === 'fence')) {
+                    obstacle.active = false;
+                    document.getElementById('status').textContent =
+                        `Status: Destroyed ${obstacle.type} while dashing!`;
+                } else if (obstacle.damagesPlayer) {
+                    document.getElementById('status').textContent =
+                        `Status: Hit ${obstacle.type}! (Takes damage)`;
+                } else {
+                    document.getElementById('status').textContent =
+                        `Status: On ${obstacle.type} (No damage)`;
+                }
+            } else {
+                document.getElementById('collisionInfo').textContent = 'Collisions: None';
+                document.getElementById('status').textContent = 'Status: Running';
+            }
+        }
+
+        function render() {
+            // Clear canvas
+            ctx.fillStyle = '#0f0f23';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw ground
+            ctx.fillStyle = '#333';
+            ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+
+            // Draw obstacles
+            obstacleManager.render(ctx, textures);
+
+            // Draw player
+            ctx.fillStyle = player.isDashing ? '#ff6b6b' : '#4ecdc4';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // Draw player info
+            ctx.fillStyle = 'white';
+            ctx.font = '12px Arial';
+            ctx.fillText(`Player: ${Math.round(player.x)}, ${Math.round(player.y)}`, 10, 20);
+            ctx.fillText(`Velocity: ${Math.round(player.velocityX)}, ${Math.round(player.velocityY)}`, 10, 35);
+            ctx.fillText(`Ground: ${player.onGround}, Dash: ${player.isDashing}`, 10, 50);
+            ctx.fillText(`Obstacles: ${obstacleManager.getActiveObstacles().length}`, 10, 65);
+        }
+
+        // Control functions
+        function spawnObstacle(type) {
+            const x = Math.random() * (canvas.width - 100) + 50;
+            const groundY = canvas.height - 20;
+            const obstacle = new Obstacle(x, groundY, type);
+
+            // Adjust Y position based on obstacle type
+            if (type === 'platform') {
+                obstacle.y = groundY - obstacle.height - 40;
+            } else if (type === 'police_car' || type === 'tall_block' || type === 'block' || type === 'fence') {
+                obstacle.y = groundY - obstacle.height;
+            }
+
+            obstacleManager.obstacles.push(obstacle);
+            document.getElementById('status').textContent = `Status: Spawned ${type} at ${Math.round(x)}`;
+        }
+
+        function clearObstacles() {
+            obstacleManager.clear();
+            document.getElementById('status').textContent = 'Status: Cleared all obstacles';
+        }
+
+        // Start the game loop
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+
+</html>
