@@ -4,17 +4,20 @@ class UI {
         this.notifications = [];
         this.particles = [];
         this.screenShake = { x: 0, y: 0, intensity: 0, duration: 0 };
+        this.combatTexts = []; // Damage numbers and combat feedback
     }
     
     update(deltaTime) {
         this.updateNotifications(deltaTime);
         this.updateParticles(deltaTime);
         this.updateScreenShake(deltaTime);
+        this.updateCombatTexts(deltaTime);
     }
     
     render(ctx) {
         this.renderNotifications(ctx);
         this.renderParticles(ctx);
+        this.renderCombatTexts(ctx);
     }
     
     // Notification system
@@ -277,61 +280,273 @@ class UI {
     
     // Weapon UI
     renderWeaponUI(ctx, weaponSystem) {
-        const margin = 20;
-        const uiX = ctx.canvas.width - 200 - margin;
-        const uiY = margin;
+        // Detect mobile and adjust sizes
+        const isMobile = ctx.canvas.width < 768;
+        const margin = isMobile ? 8 : 15;
+        const uiWidth = isMobile ? 150 : 220;
+        const uiHeight = isMobile ? 60 : 90;
+        const uiX = ctx.canvas.width - uiWidth - margin;
+        const uiY = margin + (isMobile ? 50 : 100);
         
         ctx.save();
         
-        // Ammo counter background
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(uiX, uiY, 200, 80);
+        // Gangster ammo counter background with gradient
+        const gradient = ctx.createLinearGradient(uiX, uiY, uiX, uiY + uiHeight);
+        gradient.addColorStop(0, 'rgba(26, 26, 26, 0.9)');
+        gradient.addColorStop(1, 'rgba(45, 45, 45, 0.9)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(uiX, uiY, uiWidth, uiHeight);
         
-        // Border
-        ctx.strokeStyle = '#FFD700';
+        // Neon border with glow effect
+        ctx.shadowColor = '#ff6600';
+        ctx.shadowBlur = 15;
+        ctx.strokeStyle = '#ff6600';
         ctx.lineWidth = 2;
-        ctx.strokeRect(uiX, uiY, 200, 80);
+        ctx.strokeRect(uiX, uiY, 220, 90);
+        ctx.shadowBlur = 0; // Reset shadow
         
-        // Ammo text
-        ctx.fillStyle = 'white';
-        ctx.font = 'bold 24px Arial';
+        // Inner glow effect
+        ctx.strokeStyle = 'rgba(255, 102, 0, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(uiX + 2, uiY + 2, 216, 86);
+        
+        // Ammo text with neon effect
+        ctx.fillStyle = '#ff6600';
+        ctx.font = 'bold 20px Arial Black';
         ctx.textAlign = 'left';
+        ctx.shadowColor = '#ff6600';
+        ctx.shadowBlur = 8;
         
         if (weaponSystem.isCurrentlyReloading()) {
-            // Show reload progress
-            ctx.fillText('RELOADING...', uiX + 10, uiY + 30);
+            // Show reload progress with gangster style
+            ctx.fillText('🔫 RELOADING...', uiX + 12, uiY + 28);
             
-            // Reload progress bar
+            // Reload progress bar with neon effect
             const reloadProgress = weaponSystem.getReloadPercent();
-            this.renderProgressBar(ctx, uiX + 10, uiY + 40, 180, 15, reloadProgress, '#ff6b6b');
+            this.renderGangsterProgressBar(ctx, uiX + 12, uiY + 40, 196, 18, reloadProgress, '#ff0066', '#ff6600');
             
             // Reload percentage
-            ctx.font = '14px Arial';
-            ctx.fillText(Math.round(reloadProgress * 100) + '%', uiX + 10, uiY + 70);
+            ctx.font = 'bold 14px Arial Black';
+            ctx.fillStyle = '#ff0066';
+            ctx.shadowColor = '#ff0066';
+            ctx.shadowBlur = 6;
+            ctx.fillText(Math.round(reloadProgress * 100) + '%', uiX + 12, uiY + 75);
         } else {
-            // Show ammo count
+            // Show ammo count with gangster style
             const ammoText = `${weaponSystem.getCurrentAmmo()}/${weaponSystem.getMaxAmmo()}`;
-            ctx.fillText('AMMO:', uiX + 10, uiY + 25);
-            ctx.fillText(ammoText, uiX + 10, uiY + 50);
+            ctx.fillText('🔫 AMMO:', uiX + 12, uiY + 28);
             
-            // Ammo bar
+            // Large ammo numbers
+            ctx.font = 'bold 24px Arial Black';
+            ctx.fillStyle = '#00ffff';
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 10;
+            ctx.fillText(ammoText, uiX + 12, uiY + 55);
+            
+            // Ammo bar with gangster colors
             const ammoProgress = weaponSystem.getAmmoPercent();
-            let ammoColor = '#4ecdc4';
-            if (ammoProgress < 0.3) ammoColor = '#ff6b6b';
-            else if (ammoProgress < 0.6) ammoColor = '#ffeb3b';
+            let ammoColor = '#00ffff'; // Cyan for full
+            let glowColor = '#00ffff';
+            if (ammoProgress < 0.3) {
+                ammoColor = '#ff0066'; // Hot pink for low
+                glowColor = '#ff0066';
+            } else if (ammoProgress < 0.6) {
+                ammoColor = '#ff6600'; // Orange for medium
+                glowColor = '#ff6600';
+            }
             
-            this.renderProgressBar(ctx, uiX + 10, uiY + 55, 180, 10, ammoProgress, ammoColor);
+            this.renderGangsterProgressBar(ctx, uiX + 12, uiY + 65, 196, 12, ammoProgress, ammoColor, glowColor);
         }
         
-        // Controls hint
-        ctx.font = '12px Arial';
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        // Gangster controls hint
+        ctx.font = 'bold 11px Arial Black';
+        ctx.fillStyle = '#00ffff';
+        ctx.shadowColor = '#00ffff';
+        ctx.shadowBlur = 4;
         ctx.textAlign = 'right';
-        ctx.fillText('X/Z/SPACE: Shoot | R: Reload', ctx.canvas.width - margin, ctx.canvas.height - margin);
+        ctx.fillText('🔫 X/Z/SPACE: SHOOT | R: RELOAD', ctx.canvas.width - margin, ctx.canvas.height - margin);
         
         ctx.restore();
     }
     
+    // Gangster-style progress bar with neon effects
+    renderGangsterProgressBar(ctx, x, y, width, height, progress, fillColor, glowColor) {
+        ctx.save();
+        
+        // Background (empty bar)
+        ctx.fillStyle = '#000';
+        ctx.fillRect(x, y, width, height);
+        
+        // Border with glow
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = 8;
+        ctx.strokeStyle = glowColor;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, width, height);
+        
+        // Fill (progress)
+        if (progress > 0) {
+            const fillWidth = width * progress;
+            
+            // Inner glow for fill
+            ctx.shadowColor = fillColor;
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = fillColor;
+            ctx.fillRect(x + 1, y + 1, fillWidth - 2, height - 2);
+            
+            // Bright edge effect
+            const gradient = ctx.createLinearGradient(x, y, x, y + height);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+            gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)');
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0.3)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x + 1, y + 1, fillWidth - 2, height - 2);
+        }
+        
+        ctx.restore();
+    }
+    
+    // Combat text system
+    createCombatText(x, y, text, type = 'damage', worldToScreen = null) {
+        // Convert world coordinates to screen coordinates if converter provided
+        let screenX = x;
+        let screenY = y;
+        
+        if (worldToScreen && typeof worldToScreen === 'function') {
+            const screenPos = worldToScreen(x, y);
+            screenX = screenPos.x;
+            screenY = screenPos.y;
+        }
+        
+        const combatText = {
+            x: screenX,
+            y: screenY,
+            text: text,
+            type: type,
+            life: 3.5,  // Zwiększone z 2.0 na 3.5 sekundy
+            maxLife: 3.5,
+            velocityY: -80,  // Szybszy start w górę
+            alpha: 1.0,
+            scale: 1.0
+        };
+        
+        // Different colors and effects for different types
+        switch (type) {
+            case 'damage':
+                combatText.color = '#ff0066';
+                combatText.glowColor = '#ff0066';
+                combatText.life = 2.5;
+                combatText.maxLife = 2.5;
+                break;
+            case 'headshot':
+                combatText.color = '#ff6600';
+                combatText.glowColor = '#ff6600';
+                combatText.scale = 1.4; // Zmniejszone z 1.8
+                combatText.text = 'HEADSHOT! ' + text;
+                combatText.life = 4.0; // Dłużej widoczne
+                combatText.maxLife = 4.0;
+                combatText.velocityY = -100; // Szybszy ruch w górę
+                break;
+            case 'kill':
+                combatText.color = '#00ffff';
+                combatText.glowColor = '#00ffff';
+                combatText.text = 'ELIMINATED! +' + text;
+                combatText.life = 3.5;
+                combatText.maxLife = 3.5;
+                combatText.velocityY = -90;
+                break;
+            case 'bonus':
+                combatText.color = '#FFD700';
+                combatText.glowColor = '#FFD700';
+                combatText.life = 3.0;
+                combatText.maxLife = 3.0;
+                break;
+        }
+        
+        this.combatTexts.push(combatText);
+    }
+    
+    updateCombatTexts(deltaTime) {
+        for (let i = this.combatTexts.length - 1; i >= 0; i--) {
+            const text = this.combatTexts[i];
+            
+            // Update position with smooth deceleration
+            text.y += text.velocityY * deltaTime;
+            text.velocityY += 15 * deltaTime; // Zmniejszona grawitacja dla płynniejszego ruchu
+            
+            // Update life
+            text.life -= deltaTime;
+            
+            // Smooth fade out over last 1.5 seconds
+            const fadeStartTime = 1.5;
+            if (text.life < fadeStartTime) {
+                text.alpha = text.life / fadeStartTime;
+            }
+            
+            // Scale animation for headshots - pulsing effect
+            if (text.type === 'headshot' && text.life > text.maxLife - 0.5) {
+                const t = (text.maxLife - text.life) / 0.5;
+                text.scale = 1.4 + Math.sin(t * Math.PI * 6) * 0.2; // Zmniejszone z 1.5 + 0.3
+            }
+            
+            // Scale animation for kills - growing effect
+            if (text.type === 'kill' && text.life > text.maxLife - 0.8) {
+                const t = (text.maxLife - text.life) / 0.8;
+                text.scale = 1.0 + t * 0.3; // Zmniejszone z 0.5 na 0.3
+            }
+            
+            // Floating effect - slight horizontal drift
+            const age = text.maxLife - text.life;
+            text.x += Math.sin(age * 2) * 10 * deltaTime;
+            
+            // Remove expired texts
+            if (text.life <= 0) {
+                this.combatTexts.splice(i, 1);
+            }
+        }
+    }
+    
+    renderCombatTexts(ctx) {
+        ctx.save();
+        
+        for (const text of this.combatTexts) {
+            ctx.globalAlpha = text.alpha;
+            
+            // Set up text style - rozmiar dostosowany do desktop
+            const fontSize = Math.round(11 * text.scale);
+            ctx.font = `bold ${fontSize}px Arial Black`;
+            ctx.textAlign = 'center';
+            
+            // Multiple glow layers for better visibility
+            ctx.shadowColor = text.glowColor;
+            ctx.shadowBlur = 20;
+            
+            // Thick black outline for contrast
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = Math.max(4, fontSize * 0.2);
+            ctx.strokeText(text.text, text.x, text.y);
+            
+            // Inner white outline for extra contrast
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = Math.max(2, fontSize * 0.1);
+            ctx.strokeText(text.text, text.x, text.y);
+            
+            // Main text with enhanced glow
+            ctx.fillStyle = text.color;
+            ctx.shadowBlur = 25;
+            ctx.fillText(text.text, text.x, text.y);
+            
+            // Extra glow layer for special types
+            if (text.type === 'headshot' || text.type === 'kill') {
+                ctx.shadowBlur = 35;
+                ctx.globalAlpha = text.alpha * 0.5;
+                ctx.fillText(text.text, text.x, text.y);
+            }
+        }
+        
+        ctx.restore();
+    }
+
     // Crosshair
     renderCrosshair(ctx, player) {
         const centerX = player.x + player.width / 2 + (50 * player.facingDirection);

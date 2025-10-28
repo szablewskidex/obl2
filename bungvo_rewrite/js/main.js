@@ -11,10 +11,12 @@ class BungvoGame {
         this.ui = null;
         this.physics = null;
         this.weaponSystem = null;
+        this.enemyManager = null;
         
         // Game stats
         this.score = 0;
-        this.lives = 3;
+        this.playerHP = 100;
+        this.maxHP = 100;
         this.coinsCollected = 0;
         this.totalCoins = 0;
         this.highScore = this.loadHighScore();
@@ -38,9 +40,10 @@ class BungvoGame {
         // Initialize game objects
         this.physics = new Physics();
         this.world = new World(this.canvas.width, this.canvas.height);
-        this.player = new Player(100, 400, this.physics);
+        this.player = new Player(100, this.world.getGroundY() - 100, this.physics); // Gracz na ziemi (wysokość 100px)
         this.ui = new UI();
         this.weaponSystem = new WeaponSystem();
+        this.enemyManager = new EnemyManager(this.canvas.width, this.canvas.height);
         
         // Count total coins
         this.totalCoins = this.world.coins.length;
@@ -48,7 +51,8 @@ class BungvoGame {
         
         // Reset game state
         this.score = 0;
-        this.lives = 3;
+        this.playerHP = 100;
+        this.maxHP = 100;
         this.levelCompleted = false; // Reset level completion flag
         this.updateUI();
         
@@ -62,6 +66,12 @@ class BungvoGame {
             
             // Handle special keys
             if (e.code === 'Escape') {
+                console.log('ESC pressed, mobile:', this.isMobile(), 'gameState:', this.gameState);
+                // Only block ESC on mobile during gameplay, allow in menu
+                if (this.isMobile() && this.gameState === 'playing') {
+                    console.log('Ignoring ESC on mobile during gameplay');
+                    return;
+                }
                 this.togglePause();
             }
             
@@ -107,10 +117,19 @@ class BungvoGame {
         // Update gamepad
         this.gamepadManager.update();
         
-        // Combine keyboard and gamepad inputs
+        // Combine keyboard, gamepad, and touch inputs
         const combinedKeys = { ...this.keys };
         const gamepadKeys = this.gamepadManager.getVirtualKeys();
         Object.assign(combinedKeys, gamepadKeys);
+        
+        // Add touch controls
+        if (window.touchControls && typeof window.touchControls.getStates === 'function') {
+            const touchStates = window.touchControls.getStates();
+            if (touchStates.left) combinedKeys['KeyA'] = true;
+            if (touchStates.right) combinedKeys['KeyD'] = true;
+            if (touchStates.jump) combinedKeys['Space'] = true;
+            if (touchStates.dash) combinedKeys['ShiftLeft'] = true;
+        }
         
         // Update player and get walking state
         const playerState = this.player.update(deltaTime, combinedKeys, this.world);
@@ -125,8 +144,18 @@ class BungvoGame {
             this.weaponSystem.update(deltaTime, combinedKeys, this.player, this.canvas.width, this.canvas.height, aimInput);
         }
         
+        // Update enemies
+        if (this.enemyManager) {
+            this.enemyManager.update(deltaTime, this.player, this.world, this.world.currentScrollDirection, this.canvas.width);
+        }
+        
         // Reset mouse delta
         this.mouseDeltaY = 0;
+        
+        // Update UI effects (combat texts, particles, etc.)
+        if (this.ui) {
+            this.ui.update(deltaTime);
+        }
         
         // Update independent clouds
         this.updateIndependentClouds(deltaTime);
@@ -135,7 +164,7 @@ class BungvoGame {
         this.checkCollisions();
         
         // Update world (scrolling with auto-centering)
-        const scrollDistance = this.world.update(deltaTime, playerState, this.player.x);
+        const scrollDistance = this.world.update(deltaTime, playerState, this.player.x, this.canvas.width);
         
         // Adjust player position to compensate for world scrolling
         // This keeps player centered while world scrolls
@@ -146,8 +175,9 @@ class BungvoGame {
         // Update dash power bar every frame
         this.updateDashBar();
         
-        // Check if player fell off the world
-        if (this.player.y > this.canvas.height + 100) {
+        // Check if player fell off the world (only if not already dead/respawning)
+        if (this.player.y > this.canvas.height + 200 && this.gameState === 'playing') {
+            console.log('Player fell off world:', this.player.y, 'canvas height:', this.canvas.height);
             this.playerDied();
         }
     }
@@ -158,6 +188,14 @@ class BungvoGame {
             const coin = this.world.coins[i];
             if (this.physics.checkCollision(this.player, coin)) {
                 this.collectCoin(coin, i);
+            }
+        }
+        
+        // Check health pack collection
+        for (let i = this.world.healthPacks.length - 1; i >= 0; i--) {
+            const healthPack = this.world.healthPacks[i];
+            if (this.physics.checkCollision(this.player, healthPack)) {
+                this.collectHealthPack(healthPack, i);
             }
         }
         
@@ -172,11 +210,52 @@ class BungvoGame {
         if (this.world && this.world.obstacleManager) {
             const activeObstacles = this.world.obstacleManager.getActiveObstacles();
             const bulletHits = this.weaponSystem.checkBulletCollisions(activeObstacles);
-            bulletHits.forEach(obstacle => {
-                obstacle.destroy(); // Destroy obstacle when hit by bullet
-                this.score += 25; // Bonus points for destroying obstacles
+            bulletHits.forEach(hit => {
+                if (hit.destroyed) {
+                    // Obstacle was destroyed
+                    this.score += 25; // Bonus points for destroying obstacles
+                } else {
+                    // Obstacle was damaged but not destroyed
+                    this.score += 5; // Small points for hitting
+                }
                 this.updateUI();
             });
+        }
+        
+        // Check bullet collisions with enemies
+        if (this.enemyManager && this.weaponSystem) {
+            // Create world-to-screen converter function
+            const worldToScreen = (worldX, worldY) => {
+                // For now, return world coordinates as screen coordinates
+                // This assumes no camera offset - we'll improve this if needed
+                return { x: worldX, y: worldY };
+            };
+            
+            const enemyHits = this.enemyManager.checkBulletCollisions(this.weaponSystem.bullets, this.ui, worldToScreen);
+            enemyHits.forEach(hit => {
+                if (hit.killed) {
+                    let killScore = 50;
+                    if (hit.isHeadshot) {
+                        killScore += 25; // Bonus for headshot kill
+                    }
+                    this.score += killScore;
+                } else {
+                    let hitScore = 10;
+                    if (hit.isHeadshot) {
+                        hitScore += 5; // Bonus for headshot hit
+                    }
+                    this.score += hitScore;
+                }
+                this.updateUI();
+            });
+        }
+        
+        // Check enemy collisions with player
+        if (this.enemyManager) {
+            const enemyCollisions = this.enemyManager.checkCollisions(this.player);
+            if (enemyCollisions.length > 0) {
+                this.handleEnemyCollision(enemyCollisions[0]);
+            }
         }
         
         // No platform or wall collisions needed - just walking on sidewalk
@@ -192,8 +271,57 @@ class BungvoGame {
         
         this.updateUI();
         
-        // Play sound effect (if implemented)
         console.log('Coin collected!');
+    }
+    
+    collectHealthPack(healthPack, index) {
+        this.world.healthPacks.splice(index, 1);
+        
+        // Heal player - apteczka regeneruje 30 HP
+        const healAmount = 30;
+        const oldHP = this.playerHP;
+        this.playerHP = Math.min(this.maxHP, this.playerHP + healAmount);
+        const actualHeal = this.playerHP - oldHP;
+        
+        this.score += 25; // Bonus punkty za apteczkę
+        this.updateUI();
+        
+        // Show heal combat text
+        if (this.ui && actualHeal > 0) {
+            const playerCenterX = this.player.x + this.player.width / 2;
+            const playerTopY = this.player.y - 10;
+            this.ui.createCombatText(playerCenterX, playerTopY, `+${actualHeal} HP`, 'bonus');
+        }
+        
+        console.log(`Health pack collected! +${actualHeal} HP (${this.playerHP}/${this.maxHP})`);
+    }
+    
+    handleEnemyCollision(enemy) {
+        // Player takes damage from enemy - różne damage dla różnych typów
+        let damage = 20; // Domyślne damage
+        switch(enemy.type) {
+            case 'basic': damage = 15; break;
+            case 'fast': damage = 10; break;
+            case 'tank': damage = 25; break;
+        }
+        
+        const actualDamage = this.player.takeDamage(damage);
+        if (actualDamage > 0) {
+            console.log(`Player hit by ${enemy.type} enemy! -${actualDamage} HP`);
+            this.playerHP -= actualDamage;
+            this.updateUI();
+            
+            // Add screen shake effect
+            if (this.ui) {
+                this.ui.addScreenShake(10, 0.3);
+            }
+            
+            // Check if player died
+            if (this.playerHP <= 0) {
+                this.playerHP = 0;
+                this.gameOver();
+            }
+        }
     }
     
     handleObstacleCollision(obstacle) {
@@ -225,12 +353,29 @@ class BungvoGame {
         console.log(`Player hit ${obstacle.type}!`);
         obstacle.destroy(); // Start destruction animation
         
-        // Apply damage with invincibility frames
-        if (this.player.takeDamage()) {
-            this.lives--;
+        // Apply damage with invincibility frames - różne damage dla różnych przeszkód
+        let damage = 30; // Domyślne damage dla przeszkód
+        switch(obstacle.type) {
+            case 'block': damage = 25; break;
+            case 'fence': damage = 20; break;
+            case 'car': damage = 40; break;
+            case 'police_car': damage = 35; break;
+            default: damage = 30; break;
+        }
+        
+        const actualDamage = this.player.takeDamage(damage);
+        if (actualDamage > 0) {
+            console.log(`Player hit ${obstacle.type}! -${actualDamage} HP`);
+            this.playerHP -= actualDamage;
             this.updateUI();
             
-            if (this.lives <= 0) {
+            // Add screen shake effect
+            if (this.ui) {
+                this.ui.addScreenShake(15, 0.4);
+            }
+            
+            if (this.playerHP <= 0) {
+                this.playerHP = 0;
                 this.gameOver();
             }
         }
@@ -238,15 +383,10 @@ class BungvoGame {
     }
     
     playerDied() {
-        this.lives--;
+        // Instant death - set HP to 0
+        this.playerHP = 0;
         this.updateUI();
-        
-        if (this.lives <= 0) {
-            this.gameOver();
-        } else {
-            // Respawn player
-            this.player.respawn(100, 400);
-        }
+        this.gameOver();
     }
     
     gameOver() {
@@ -293,10 +433,15 @@ class BungvoGame {
             this.player.render(this.ctx);
         }
         
+        // Render enemies
+        if (this.enemyManager) {
+            this.enemyManager.render(this.ctx);
+        }
+        
         // Render weapon system (bullets, shell casings, weapon)
         if (this.weaponSystem && this.player) {
             this.weaponSystem.renderBullets(this.ctx);
-            this.weaponSystem.renderShellCasings(this.ctx, this.canvas.height - 20);
+            this.weaponSystem.renderShellCasings(this.ctx, this.world.getGroundY());
             this.weaponSystem.renderWeapon(this.ctx, this.player);
         }
         
@@ -307,6 +452,11 @@ class BungvoGame {
         if (this.weaponSystem && this.ui && this.player) {
             this.ui.renderWeaponUI(this.ctx, this.weaponSystem);
             // Usunięto renderCrosshair - brak celownika
+        }
+        
+        // Render UI effects (combat texts, particles, notifications)
+        if (this.ui) {
+            this.ui.render(this.ctx);
         }
         
         if (this.gameState === 'paused') {
@@ -369,7 +519,7 @@ class BungvoGame {
         
         // Position player in center
         this.player.x = this.canvas.width * 0.5; // Center of screen
-        this.player.y = this.canvas.height - 20 - this.player.height; // Stopy dokładnie na chodnik
+        this.player.y = this.world.getGroundY() - this.player.height; // Stopy dokładnie na chodnik
         
         // Initialize independent clouds system
         this.initIndependentClouds();
@@ -379,8 +529,13 @@ class BungvoGame {
     
     togglePause() {
         if (this.gameState === 'playing') {
-            this.gameState = 'paused';
+            // Show menu instead of pause screen
+            this.showMenu();
         } else if (this.gameState === 'paused') {
+            this.gameState = 'playing';
+        } else if (this.gameState === 'menu') {
+            // Resume game from menu
+            this.hideMenu();
             this.gameState = 'playing';
         }
     }
@@ -395,10 +550,32 @@ class BungvoGame {
         document.getElementById('menu').classList.add('hidden');
     }
     
+    isMobile() {
+        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        console.log('isMobile check:', isMobileDevice, 'User Agent:', navigator.userAgent);
+        return isMobileDevice;
+    }
+    
     updateUI() {
         document.getElementById('score').textContent = this.score;
-        document.getElementById('lives').textContent = this.lives;
+        document.getElementById('lives').textContent = `${this.playerHP}/${this.maxHP} HP`;
         document.getElementById('coins').textContent = this.coinsCollected;
+        
+        // Update HP bar
+        const hpPercent = (this.playerHP / this.maxHP) * 100;
+        const hpBarFill = document.getElementById('hpBarFill');
+        if (hpBarFill) {
+            hpBarFill.style.width = hpPercent + '%';
+            
+            // Change color based on HP level
+            if (hpPercent > 60) {
+                hpBarFill.style.background = 'linear-gradient(90deg, #00ff00, #66ff00)'; // Green
+            } else if (hpPercent > 30) {
+                hpBarFill.style.background = 'linear-gradient(90deg, #ffff00, #ff6600)'; // Yellow/Orange
+            } else {
+                hpBarFill.style.background = 'linear-gradient(90deg, #ff0066, #ff0000)'; // Red
+            }
+        }
     }
     
     updateDashBar() {
@@ -516,6 +693,15 @@ window.game = game; // Expose to window for canvas resize
 // Global functions for HTML buttons
 function startGame() {
     if (!game) {
+        // Ensure canvas is properly sized before creating game
+        const canvas = document.getElementById('gameCanvas');
+        const screenWidth = window.innerWidth || document.documentElement.clientWidth;
+        const screenHeight = window.innerHeight || document.documentElement.clientHeight;
+        canvas.width = screenWidth;
+        canvas.height = screenHeight;
+        canvas.style.width = screenWidth + 'px';
+        canvas.style.height = screenHeight + 'px';
+        
         game = new BungvoGame();
         window.game = game; // Expose to window
     }
@@ -555,6 +741,12 @@ function showInstructions() {
 This uses the original Bungvo parallax system!`);
 }
 
+function toggleMobileMenu() {
+    if (window.game) {
+        window.game.togglePause();
+    }
+}
+
 // Initialize game when page loads
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Bungvo Enhanced loaded!');
@@ -569,9 +761,14 @@ function setupMenuGamepad() {
     // Get menu buttons
     const startButton = document.querySelector('.menu-button:nth-child(1)');
     const instructionsButton = document.querySelector('.menu-button:nth-child(2)');
+    const settingsButton = document.querySelector('.menu-button:nth-child(3)');
     
-    if (startButton && instructionsButton) {
-        menuButtons.push(startButton, instructionsButton);
+    menuButtons.length = 0; // Clear existing buttons
+    if (startButton) menuButtons.push(startButton);
+    if (instructionsButton) menuButtons.push(instructionsButton);
+    if (settingsButton) menuButtons.push(settingsButton);
+    
+    if (menuButtons.length > 0) {
         updateMenuSelection();
     }
 }
@@ -589,8 +786,10 @@ function updateMenuSelection() {
 }
 
 function handleMenuGamepad() {
+    // Allow gamepad menu on all platforms now
+    
     const menu = document.getElementById('menu');
-    if (!menu || menu.style.display === 'none') return;
+    if (!menu || menu.classList.contains('hidden')) return;
     
     if (menuButtons.length === 0) {
         setupMenuGamepad();

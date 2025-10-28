@@ -75,7 +75,8 @@ class Bullet {
     
     checkCollision(target) {
         const bulletRect = this.getRect();
-        const targetRect = target.getRect();
+        // Use full hitbox for bullet collision if available
+        const targetRect = target.getBulletRect ? target.getBulletRect() : target.getRect();
         
         return (bulletRect.x < targetRect.x + targetRect.width &&
                 bulletRect.x + bulletRect.width > targetRect.x &&
@@ -106,9 +107,9 @@ class WeaponSystem {
         
         // Aiming system
         this.aimAngle = 0; // Current aim angle in radians
-        this.maxAimAngle = Math.PI / 3; // Max 60 degrees up/down
-        this.aimSensitivity = 0.002; // Mouse sensitivity
-        this.gamepadAimSensitivity = 2.0; // Gamepad sensitivity
+        this.maxAimAngle = Math.PI / 2; // Max 90 degrees up/down (full vertical range)
+        this.baseMouseSensitivity = 0.005; // Base mouse sensitivity
+        this.baseGamepadSensitivity = 4.0; // Base gamepad sensitivity
         
         // Load weapon hand sprite
         this.weaponHandSprite = new Image();
@@ -141,16 +142,24 @@ class WeaponSystem {
         this.playerIsFlipping = player.isFlipping;
         this.playerFlipRotation = player.flipRotation;
         
-        // Update aiming when weapon is visible
-        if (this.isShooting) {
+        // Check if player is trying to shoot (holding shoot key)
+        const shootKey = keys['KeyX'] || keys['KeyZ'] || keys['MouseLeft'];
+        this.isAiming = shootKey && !this.isReloading;
+        
+        // Update aiming when player is trying to shoot
+        if (this.isAiming) {
+            // Get sensitivity multipliers from settings
+            const mouseSensitivity = window.gameSettings ? window.gameSettings.getMouseSensitivity() : 1.0;
+            const gamepadSensitivity = window.gameSettings ? window.gameSettings.getGamepadSensitivity() : 1.0;
+            
             // Mouse aiming (vertical movement)
             if (aimInput.mouseDeltaY) {
-                this.aimAngle += aimInput.mouseDeltaY * this.aimSensitivity;
+                this.aimAngle += aimInput.mouseDeltaY * this.baseMouseSensitivity * mouseSensitivity;
             }
             
             // Gamepad aiming (left stick Y)
             if (Math.abs(aimInput.gamepadLeftStickY) > 0.1) {
-                this.aimAngle += aimInput.gamepadLeftStickY * this.gamepadAimSensitivity * deltaTime;
+                this.aimAngle += aimInput.gamepadLeftStickY * this.baseGamepadSensitivity * gamepadSensitivity * deltaTime;
             }
             
             // Clamp aim angle
@@ -192,9 +201,8 @@ class WeaponSystem {
             this.isShooting = false;
         }
         
-        // Handle shooting input - X/Z dla klawiatury, LPM dla myszy
-        const shootKey = keys['KeyX'] || keys['KeyZ'] || keys['MouseLeft'];
-        if (shootKey && this.canShoot && !this.isReloading && this.currentAmmo > 0 && this.fireTimer <= 0) {
+        // Handle shooting input - use the same shootKey variable from above
+        if (this.isAiming && this.canShoot && !this.isReloading && this.currentAmmo > 0 && this.fireTimer <= 0) {
             this.shoot(player);
         }
         
@@ -252,14 +260,44 @@ class WeaponSystem {
     }
     
     shoot(player) {
-        // Create bullet from gun barrel position with aim angle
-        const baseX = player.x + player.width/2 + (45 * player.facingDirection);
-        const baseY = player.y + player.height/2 + this.weaponOffset.y;
+        // Calculate weapon position (same as in render)
+        const weaponX = player.x + player.width/2 + (this.weaponOffset.x * player.facingDirection);
+        const weaponY = player.y + player.height/2 + this.weaponOffset.y;
+        const recoilOffset = this.recoilAmount * -5 * player.facingDirection;
+        
+        // Calculate barrel position using SAME logic as rendering
+        let barrelX, barrelY;
+        
+        if (this.aimAngle !== 0) {
+            // Use EXACT same pivot calculation as in render
+            const pivotX = player.facingDirection > 0 ? 
+                weaponX + recoilOffset - 30 : 
+                weaponX + recoilOffset + 30;
+            const pivotY = weaponY;
+            
+            // Calculate barrel position (end of weapon sprite)
+            const weaponEndOffsetX = 30 * player.facingDirection; // From pivot to weapon end
+            const weaponEndOffsetY = 0;
+            
+            // Apply rotation to weapon end offset
+            const cos = Math.cos(this.aimAngle * player.facingDirection);
+            const sin = Math.sin(this.aimAngle * player.facingDirection);
+            
+            const rotatedEndX = weaponEndOffsetX * cos - weaponEndOffsetY * sin;
+            const rotatedEndY = weaponEndOffsetX * sin + weaponEndOffsetY * cos;
+            
+            barrelX = pivotX + rotatedEndX;
+            barrelY = pivotY + rotatedEndY;
+        } else {
+            // No aiming, simple offset
+            barrelX = weaponX + recoilOffset + (30 * player.facingDirection);
+            barrelY = weaponY;
+        }
         
         // Apply aim angle to bullet direction
         const aimDirection = {
             x: player.facingDirection,
-            y: Math.sin(this.aimAngle * player.facingDirection)
+            y: Math.sin(this.aimAngle)
         };
         
         // Normalize direction
@@ -267,7 +305,7 @@ class WeaponSystem {
         aimDirection.x /= magnitude;
         aimDirection.y /= magnitude;
         
-        const bullet = new Bullet(baseX, baseY, aimDirection.x, 800, aimDirection.y);
+        const bullet = new Bullet(barrelX, barrelY, aimDirection.x, 800, aimDirection.y);
         this.bullets.push(bullet);
         
         // Consume ammo
@@ -286,8 +324,8 @@ class WeaponSystem {
         // Set shooting state
         this.shootingTimer = this.shootingDuration;
         
-        // Create shell casing
-        this.createShellCasing(baseX - (10 * player.facingDirection), baseY - 5, player.facingDirection);
+        // Create shell casing from weapon position
+        this.createShellCasing(weaponX - (10 * player.facingDirection), weaponY - 5, player.facingDirection);
         
         console.log(`Shot fired! Ammo: ${this.currentAmmo}/${this.maxAmmo}`);
     }
@@ -323,8 +361,10 @@ class WeaponSystem {
     }
     
     renderWeapon(ctx, player) {
-        // Only show weapon when shooting
-        if (!this.isShooting) return;
+        // Show weapon when shooting OR when aiming
+        const showWeapon = this.isShooting || this.isAiming;
+        
+        if (!showWeapon) return;
         
         ctx.save();
         
@@ -416,12 +456,35 @@ class WeaponSystem {
             ctx.fillRect(armX + 40, armY + 6, 8, 10);
         }
         
-        // Draw muzzle flash at gun barrel
+        // Draw muzzle flash at gun barrel (same position as bullets spawn)
         if (this.muzzleFlash.active) {
             ctx.fillStyle = '#FFFF00';
             ctx.globalAlpha = 0.8;
-            const flashX = weaponX + (45 * player.facingDirection) + recoilOffset; // Dalej - przy lufie
-            const flashY = weaponY;
+            
+            // Use same calculation as bullet spawn for consistency
+            let flashX, flashY;
+            if (this.aimAngle !== 0) {
+                const pivotX = player.facingDirection > 0 ? 
+                    weaponX + recoilOffset - 30 : 
+                    weaponX + recoilOffset + 30;
+                const pivotY = weaponY;
+                
+                const weaponEndOffsetX = 30 * player.facingDirection;
+                const weaponEndOffsetY = 0;
+                
+                const cos = Math.cos(this.aimAngle * player.facingDirection);
+                const sin = Math.sin(this.aimAngle * player.facingDirection);
+                
+                const rotatedEndX = weaponEndOffsetX * cos - weaponEndOffsetY * sin;
+                const rotatedEndY = weaponEndOffsetX * sin + weaponEndOffsetY * cos;
+                
+                flashX = pivotX + rotatedEndX;
+                flashY = pivotY + rotatedEndY;
+            } else {
+                flashX = weaponX + recoilOffset + (30 * player.facingDirection);
+                flashY = weaponY;
+            }
+            
             ctx.fillRect(flashX - 5, flashY - 3, 10, 6);
             ctx.globalAlpha = 1.0;
         }
@@ -484,7 +547,16 @@ class WeaponSystem {
             obstacles.forEach(obstacle => {
                 if (obstacle.active && !obstacle.isDestroying && bullet.checkCollision(obstacle)) {
                     bullet.active = false;
-                    hits.push(obstacle);
+                    
+                    // Use takeDamage if available, otherwise destroy immediately
+                    if (typeof obstacle.takeDamage === 'function') {
+                        const destroyed = obstacle.takeDamage(bullet.damage || 1);
+                        hits.push({ obstacle, destroyed });
+                    } else {
+                        // Fallback for obstacles without HP system
+                        obstacle.destroy();
+                        hits.push({ obstacle, destroyed: true });
+                    }
                 }
             });
         });

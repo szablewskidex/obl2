@@ -4,7 +4,7 @@ class Player {
         this.x = x;
         this.y = y;
         this.width = 60;   // Keep width
-        this.height = 140; // Much taller to ensure legs are not cut off
+        this.height = 100; // Zmniejszone z 140 na 100
         this.physics = physics;
 
         // Load character atlas
@@ -383,8 +383,8 @@ class Player {
             }
         }
 
-        // Simple ground collision (sidewalk level) - dostosowane do wysokości postaci
-        const groundY = world.height - 20;  // Zmienione z -40 na -20 żeby stopy były dokładnie na chodnik
+        // Simple ground collision (sidewalk level) - stały poziom ziemi
+        const groundY = world.getGroundY();
         const tolerance = 2; // Small tolerance for floating point errors
 
         if (!onPlatform && this.y + this.height >= groundY - tolerance) {
@@ -938,14 +938,14 @@ class Player {
         return this.dashCharges;
     }
 
-    takeDamage() {
-        if (this.isInvincible) return false; // Already invincible, no damage
+    takeDamage(damage = 20) {
+        if (this.isInvincible) return 0; // Already invincible, no damage
 
         // Activate invincibility
         this.isInvincible = true;
         this.invincibilityTimer = this.invincibilityDuration;
 
-        return true; // Damage taken
+        return damage; // Return amount of damage taken
     }
 
     isVulnerable() {

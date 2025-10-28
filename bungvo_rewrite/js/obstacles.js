@@ -16,6 +16,11 @@ class Obstacle {
         this.animationTimer = 0;
         this.bobOffset = Math.random() * Math.PI * 2; // Random phase for bobbing
         
+        // HP system for obstacles
+        this.health = 1;
+        this.maxHealth = 1;
+        this.hitFlash = 0; // Hit flash effect
+        
         // Destruction animation
         this.isDestroying = false;
         this.destructionTimer = 0;
@@ -61,6 +66,8 @@ class Obstacle {
                 this.damagesPlayer = false; // Can jump on it without taking damage
                 this.isPlatform = true; // Can stand on top
                 this.useOriginalSize = true; // Don't scale, use original image size
+                this.health = 3; // Police car wymaga 3 strzałów
+                this.maxHealth = 3;
                 break;
             default:
                 this.width = 40;
@@ -71,9 +78,28 @@ class Obstacle {
         }
     }
     
+    takeDamage(damage = 1) {
+        if (this.isDestroying) return false;
+        
+        this.health -= damage;
+        this.hitFlash = 0.2; // Hit flash effect
+        
+        if (this.health <= 0) {
+            this.destroy();
+            return true; // Obstacle destroyed
+        }
+        
+        return false; // Obstacle damaged but not destroyed
+    }
+    
     update(deltaTime, scrollSpeed, scrollDirection, screenWidth = 1200) {
         // Update animation
         this.animationTimer += deltaTime;
+        
+        // Update hit flash
+        if (this.hitFlash > 0) {
+            this.hitFlash -= deltaTime;
+        }
         
         // Update destruction animation
         if (this.isDestroying) {
@@ -140,6 +166,11 @@ class Obstacle {
             yOffset = Math.sin(this.animationTimer * 2 + this.bobOffset) * 2;
         }
         
+        // Apply hit flash effect
+        if (this.hitFlash > 0) {
+            ctx.filter = 'brightness(200%) saturate(150%)';
+        }
+        
         // Draw obstacle
         const texture = textures[this.texture];
         if (texture && texture.complete) {
@@ -166,6 +197,28 @@ class Obstacle {
             ctx.strokeStyle = '#333';
             ctx.lineWidth = 2;
             ctx.strokeRect(this.x, this.y + yOffset, this.width, this.height);
+        }
+        
+        // Draw health bar for police car if damaged
+        if (this.type === 'police_car' && this.health < this.maxHealth && !this.isDestroying) {
+            const barWidth = this.width * 0.8;
+            const barHeight = 8;
+            const barX = this.x + (this.width - barWidth) / 2;
+            const barY = this.y - 15;
+            const healthPercent = this.health / this.maxHealth;
+            
+            // Background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+            
+            // Health
+            ctx.fillStyle = healthPercent > 0.6 ? '#00ff00' : (healthPercent > 0.3 ? '#ffff00' : '#ff0000');
+            ctx.fillRect(barX, barY, barWidth * healthPercent, barHeight);
+            
+            // Border
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(barX, barY, barWidth, barHeight);
         }
         
         ctx.restore();
@@ -215,6 +268,16 @@ class Obstacle {
             y: this.y + this.height * margin,
             width: this.width * (1 - margin * 2),
             height: this.height * (1 - margin * 2)
+        };
+    }
+    
+    // Full hitbox for bullet collision
+    getBulletRect() {
+        return {
+            x: this.x,
+            y: this.y,
+            width: this.width,
+            height: this.height
         };
     }
     

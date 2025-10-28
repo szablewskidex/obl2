@@ -125,8 +125,9 @@ class GamepadManager {
             keys['ShiftRight'] = true;
         }
         
-        // Pause/Menu
+        // Pause/Menu - only START/SELECT buttons, not A button
         if (this.isButtonJustPressed(this.buttons.START) || this.isButtonJustPressed(this.buttons.SELECT)) {
+            console.log('Gamepad generating ESC, mobile:', this.isMobile());
             keys['Escape'] = true;
         }
         
@@ -135,5 +136,9 @@ class GamepadManager {
     
     isConnected() {
         return Object.keys(this.gamepads).length > 0;
+    }
+    
+    isMobile() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     }
 }

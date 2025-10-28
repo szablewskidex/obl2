@@ -4,8 +4,12 @@ class World {
         this.width = width;
         this.height = height;
         
+        // Stały ground level niezależny od canvas height
+        this.GROUND_LEVEL = 600; // Stała pozycja ziemi
+        
         // Infinite runner - no static platforms, everything scrolls
         this.coins = [];
+        this.healthPacks = []; // Apteczki do regeneracji HP
         this.obstacles = []; // Legacy - now using ObstacleManager
         
         // Initialize obstacle manager
@@ -14,7 +18,8 @@ class World {
         // Parallax scrolling system
         this.scrollSpeed = 250; // Base scroll speed - matches player speed
         this.currentScrollDirection = 0; // Smooth scroll direction
-        this.totalScrollDistance = 0; // Track total scroll distance (can't go negative)
+        this.totalScrollDistance = 0; // Track total scroll distance from start
+        this.maxLeftBoundary = 0; // How far left player can go (relative to current view)
         this.parallaxLayers = [];
         
         // Load original textures
@@ -71,7 +76,7 @@ class World {
                 texture: 'download',  // Red brick buildings in background - CORRECTED
                 speed: 0.4,  // Background speed
                 y: this.height * 0.05,  // Przesunięte w dół
-                scale: 1.8,  // Zmniejszone o 0.2 (2.0 - 0.2 = 1.8)
+                scale: this.height < 600 ? 1.0 : 1.8,  // Lekko zwiększone na mobile
                 mirroring: 900,
                 renderType: 'texture'  // Use texture rendering - NO CLIPPING
             },
@@ -80,7 +85,7 @@ class World {
                 texture: 'oblockmid',  // Green trees/bushes behind fence - CORRECTED
                 speed: 0.7,  // Closer to foreground
                 y: this.height * 0.25,  // Przesunięte w dół
-                scale: 1.5,  // Przywrócona rozsądna skala
+                scale: this.height < 600 ? 0.8 : 1.5,  // Lekko zwiększone na mobile
                 mirroring: 912,
                 renderType: 'texture'  // Use texture rendering - NO HEIGHT LIMITS, NO CLIPPING
             },
@@ -88,8 +93,8 @@ class World {
                 name: 'fence_and_sidewalk',
                 texture: 'oblockfence',  // Black fence with green bushes + gray sidewalk
                 speed: 1.0,  // Full speed - foreground
-                y: this.height * 0.50,  // Wyżej - chodnik w dolnej połowie ekranu
-                scale: 1.8,  // Smaller scale for testing
+                y: this.height < 600 ? this.height - 292 : this.height * 0.50,  // Chodnik na dole na mobile
+                scale: this.height < 600 ? 1.0 : 1.8,  // Mniejsze skalowanie na mobile
                 mirroring: 1000,
                 renderType: 'texture'
             }
@@ -109,12 +114,27 @@ class World {
         for (let i = 0; i < 20; i++) {
             this.coins.push({
                 x: i * 200 + Math.random() * 100,
-                y: this.height - 120, // On gray sidewalk
+                y: this.getGroundY() - 100, // On gray sidewalk
                 width: 32,  // Bigger for better visibility
                 height: 32,
                 collected: false,
                 scrolled: false
             });
+        }
+        
+        // Generate health packs with 5% chance - bardzo rzadkie
+        this.healthPacks = [];
+        for (let i = 0; i < 20; i++) {
+            if (Math.random() < 0.05) { // 5% szansy na spawn (zmniejszone z 20%)
+                this.healthPacks.push({
+                    x: i * 500 + Math.random() * 200, // Znacznie bardziej rozrzucone
+                    y: this.getGroundY() - 110, // Trochę wyżej niż monety
+                    width: 40,  // Trochę większe niż monety
+                    height: 40,
+                    collected: false,
+                    scrolled: false
+                });
+            }
         }
         
         console.log(`Infinite runner setup: ${this.parallaxLayers.length} parallax layers, ${this.coins.length} scrolling coins`);
@@ -164,7 +184,7 @@ class World {
         });
     }
     
-    update(deltaTime, playerState, playerX) {
+    update(deltaTime, playerState, playerX, screenWidth) {
         // Update obstacle manager ground level if height changed
         if (this.obstacleManager && this.obstacleManager.worldHeight !== this.height) {
             this.obstacleManager.updateGroundY(this.height);
@@ -189,21 +209,11 @@ class World {
         if (playerState.isWalking && playerState.walkDirection !== 0) {
             // Player is moving - follow their direction
             targetDirection = playerState.walkDirection;
-            
-            // Don't scroll left if player is at left edge
-            if (targetDirection < 0 && playerX <= 0) {
-                targetDirection = 0;
-            }
         } else {
             // Player stopped - auto-center camera
             if (Math.abs(distanceFromCenter) > centerThreshold) {
                 // Slowly scroll to center player
                 targetDirection = distanceFromCenter > 0 ? 0.3 : -0.3; // Slow centering
-                
-                // Don't scroll left if player is at left edge
-                if (targetDirection < 0 && playerX <= 0) {
-                    targetDirection = 0;
-                }
             }
         }
         
@@ -221,14 +231,16 @@ class World {
             const actualScrollSpeed = this.scrollSpeed * speedMultiplier;
             scrollDistance = actualScrollSpeed * deltaTime * this.currentScrollDirection;
             
-            // Check if trying to scroll left (backwards) beyond start
+            // Check if trying to scroll left (backwards) beyond rendered area
             if (this.currentScrollDirection < 0) {
                 // Scrolling left (backwards)
                 const newTotalScroll = this.totalScrollDistance + scrollDistance;
-                if (newTotalScroll < 0) {
-                    // Hit the left boundary - clamp to 0
-                    scrollDistance = -this.totalScrollDistance;
-                    this.currentScrollDirection = 0; // Stop scrolling
+                // Allow going back only to the leftmost rendered area (about 1 screen width)
+                const minAllowedScroll = Math.max(0, this.totalScrollDistance - screenWidth);
+                if (newTotalScroll < minAllowedScroll) {
+                    // Hit the left boundary - clamp to rendered area
+                    scrollDistance = minAllowedScroll - this.totalScrollDistance;
+                    this.currentScrollDirection = 0; // Stop scrolling at boundary
                 }
             }
             
@@ -255,8 +267,19 @@ class World {
                 }
             });
             
-            // Remove scrolled coins
+            // Update scrolling health packs with smooth direction
+            this.healthPacks.forEach(healthPack => {
+                healthPack.x -= actualScrollSpeed * deltaTime * this.currentScrollDirection;
+                
+                // Mark health packs that have scrolled off screen
+                if (healthPack.x < -healthPack.width || healthPack.x > this.width + healthPack.width) {
+                    healthPack.scrolled = true;
+                }
+            });
+            
+            // Remove scrolled coins and health packs
             this.coins = this.coins.filter(coin => !coin.scrolled && !coin.collected);
+            this.healthPacks = this.healthPacks.filter(hp => !hp.scrolled && !hp.collected);
             
             // Infinite scroller - add coins when needed
             const spawnDistance = 400; // Distance from edge to spawn
@@ -272,7 +295,7 @@ class World {
                     const newX = rightmostCoin + minCoinSpacing + Math.random() * 100;
                     this.coins.push({
                         x: newX,
-                        y: this.height - 120,
+                        y: this.getGroundY() - 100,
                         width: 32,
                         height: 32,
                         collected: false,
@@ -290,12 +313,49 @@ class World {
                     const newX = leftmostCoin - minCoinSpacing - Math.random() * 100;
                     this.coins.push({
                         x: newX,
-                        y: this.height - 120,
+                        y: this.getGroundY() - 100,
                         width: 32,
                         height: 32,
                         collected: false,
                         scrolled: false,
                         rotation: 0
+                    });
+                }
+            }
+            
+            // Spawn health packs with 20% chance - podobnie jak monety ale rzadziej
+            if (this.currentScrollDirection > 0.05) {
+                // Scrolling left - check if we need health packs on the right
+                const healthPackXs = this.healthPacks.map(hp => hp.x);
+                const rightmostHealthPack = healthPackXs.length > 0 ? Math.max(...healthPackXs) : this.width / 2;
+                
+                // Add health pack with 3% chance if needed (bardzo rzadko)
+                if (rightmostHealthPack < this.width + spawnDistance && Math.random() < 0.03) {
+                    const newX = rightmostHealthPack + 600 + Math.random() * 400; // Znacznie większy spacing
+                    this.healthPacks.push({
+                        x: newX,
+                        y: this.getGroundY() - 110,
+                        width: 40,
+                        height: 40,
+                        collected: false,
+                        scrolled: false
+                    });
+                }
+            } else if (this.currentScrollDirection < -0.05) {
+                // Scrolling right - check if we need health packs on the left
+                const healthPackXs = this.healthPacks.map(hp => hp.x);
+                const leftmostHealthPack = healthPackXs.length > 0 ? Math.min(...healthPackXs) : this.width / 2;
+                
+                // Add health pack with 3% chance if needed (bardzo rzadko)
+                if (leftmostHealthPack > -spawnDistance && Math.random() < 0.03) {
+                    const newX = leftmostHealthPack - 600 - Math.random() * 400; // Znacznie większy spacing
+                    this.healthPacks.push({
+                        x: newX,
+                        y: this.getGroundY() - 110,
+                        width: 40,
+                        height: 40,
+                        collected: false,
+                        scrolled: false
                     });
                 }
             }
@@ -324,6 +384,7 @@ class World {
         this.renderParallaxLayers(ctx);
         // Clouds are now rendered in main.js context, not world context
         this.renderScrollingCoins(ctx);
+        this.renderHealthPacks(ctx);
         
         // Render obstacles
         if (this.obstacleManager) {
@@ -482,6 +543,46 @@ class World {
         }
     }
     
+    renderHealthPacks(ctx) {
+        for (const healthPack of this.healthPacks) {
+            if (healthPack.collected || healthPack.x < -healthPack.width || healthPack.x > this.width + healthPack.width) continue;
+            
+            ctx.save();
+            
+            // Move to health pack center
+            ctx.translate(healthPack.x + healthPack.width / 2, healthPack.y + healthPack.height / 2);
+            
+            // Pulsing effect
+            const time = Date.now() / 1000;
+            const pulse = 1 + Math.sin(time * 4) * 0.1;
+            ctx.scale(pulse, pulse);
+            
+            // Draw health pack - czerwony krzyż na białym tle
+            // Białe tło
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(-healthPack.width / 2, -healthPack.height / 2, healthPack.width, healthPack.height);
+            
+            // Czerwona ramka
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(-healthPack.width / 2, -healthPack.height / 2, healthPack.width, healthPack.height);
+            
+            // Czerwony krzyż
+            ctx.fillStyle = '#ff0000';
+            // Pozioma belka krzyża
+            ctx.fillRect(-healthPack.width * 0.3, -healthPack.height * 0.1, healthPack.width * 0.6, healthPack.height * 0.2);
+            // Pionowa belka krzyża
+            ctx.fillRect(-healthPack.width * 0.1, -healthPack.height * 0.3, healthPack.width * 0.2, healthPack.height * 0.6);
+            
+            // Glow effect
+            ctx.shadowColor = '#ff0066';
+            ctx.shadowBlur = 10;
+            ctx.strokeRect(-healthPack.width / 2, -healthPack.height / 2, healthPack.width, healthPack.height);
+            
+            ctx.restore();
+        }
+    }
+    
     // Helper methods for collision detection
     getPlatforms() {
         return this.platforms;
@@ -500,7 +601,7 @@ class World {
         
         // Generate fewer obstacles, further away from player
         const obstacleTypes = ['block', 'fence', 'platform']; // Remove tall_block from initial spawn
-        const groundY = this.height - 20;
+        const groundY = this.getGroundY();
         
         // Only spawn 3 obstacles initially, far ahead
         const numObstacles = 3;
@@ -538,5 +639,27 @@ class World {
             return this.obstacleManager.getActiveObstacles();
         }
         return [];
+    }
+    
+    // Get ground level - dopasowany do rzeczywistej pozycji chodnika
+    getGroundY() {
+        // Znajdź layer z chodnikiem
+        const sidewalkLayer = this.parallaxLayers.find(layer => layer.name === 'fence_and_sidewalk');
+        if (!sidewalkLayer) {
+            // Fallback jeśli nie ma layer
+            return this.height - 20;
+        }
+        
+        // Chodnik jest renderowany na określonej pozycji Y z określonym skalowaniem
+        const sidewalkLayerY = sidewalkLayer.y;
+        const layerScale = sidewalkLayer.scale;
+        const textureHeight = 292; // Wysokość oblockfence.png
+        const scaledTextureHeight = textureHeight * layerScale;
+        
+        // Chodnik (szary pas) jest w dolnej części tekstury - około 85%
+        const sidewalkOffsetInTexture = scaledTextureHeight * 0.85;
+        
+        // Oblicz rzeczywistą pozycję chodnika
+        return sidewalkLayerY + sidewalkOffsetInTexture;
     }
 }
