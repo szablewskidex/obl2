@@ -674,6 +674,13 @@
             }
         });
         
+        // Initialize game
+        window.addEventListener('load', () => {
+            console.log('Initializing Bungvo game...');
+            window.game = new BungvoGame();
+            console.log('Game initialized successfully!');
+        });
+        
         // Register service worker for PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
