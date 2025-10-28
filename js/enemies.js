@@ -827,21 +827,24 @@ class EnemyManager {
         // Update existing enemies
         this.enemies.forEach(enemy => {
             enemy.update(deltaTime, player, world);
-            
-            // Move enemies with world scrolling
-            enemy.x -= world.scrollSpeed * deltaTime * scrollDirection;
+            // ✅ NIE przesuwaj wrogów - oni mają swoją AI
+            // World scrolling jest już obsługiwany przez pozycję gracza
         });
         
-        // Remove inactive enemies
-        this.enemies = this.enemies.filter(enemy => enemy.active);
+        // Remove inactive enemies AND enemies that went off screen LEFT
+        this.enemies = this.enemies.filter(enemy => {
+            if (!enemy.active) return false;
+            if (enemy.x < -enemy.width - 100) return false; // ✅ Usuń gdy 100px za lewą krawędzią
+            return true;
+        });
         
         // Update spawn cooldown
         if (this.spawnCooldown > 0) {
             this.spawnCooldown -= deltaTime;
         }
         
-        // Spawn new enemies when scrolling right
-        if (scrollDirection > 0.05 && this.spawnCooldown <= 0) {
+        // ✅ ZAWSZE spawnuj z prawej (nie tylko gdy scrollDirection > 0)
+        if (this.spawnCooldown <= 0) {
             this.checkSpawnEnemies(screenWidth);
             this.spawnCooldown = this.spawnCooldownTime;
         }
@@ -850,9 +853,13 @@ class EnemyManager {
     checkSpawnEnemies(screenWidth) {
         const activeEnemies = this.enemies.filter(e => e.active && !e.isDying);
         const enemyXs = activeEnemies.map(e => e.x);
-        const rightmostEnemy = enemyXs.length > 0 ? Math.max(...enemyXs) : screenWidth / 2;
         
-        // Check if we should spawn a new enemy
+        // ✅ Zacznij spawning za ekranem
+        const rightmostEnemy = enemyXs.length > 0 ? 
+            Math.max(...enemyXs) : 
+            screenWidth + 200;
+        
+        // Spawn jeśli ostatni wróg wszedł na ekran
         if (rightmostEnemy < screenWidth + this.spawnDistance) {
             this.trySpawnEnemy(rightmostEnemy, screenWidth);
         }
@@ -864,7 +871,12 @@ class EnemyManager {
         
         // Calculate spawn position
         const spacing = this.minEnemySpacing + Math.random() * (this.maxEnemySpacing - this.minEnemySpacing);
-        const newX = referenceX + spacing;
+        
+        // ✅ ZAWSZE za prawą krawędzią
+        const newX = Math.max(
+            referenceX + spacing,
+            screenWidth + 100 // Minimum 100px za ekranem
+        );
         
         // Choose random enemy type
         const enemyType = this.getRandomEnemyType();
@@ -874,7 +886,7 @@ class EnemyManager {
         const enemy = new Enemy(newX, groundY - 60, enemyType); // 60 is approximate enemy height
         
         this.enemies.push(enemy);
-        console.log(`Spawned ${enemyType} enemy at x: ${newX}`);
+        console.log(`✅ Spawned ${enemyType} at x: ${newX} (screen: ${screenWidth})`);
     }
     
     getRandomEnemyType() {
