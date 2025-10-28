@@ -843,40 +843,83 @@ class EnemyManager {
             this.spawnCooldown -= deltaTime;
         }
         
-        // ✅ ZAWSZE spawnuj z prawej (nie tylko gdy scrollDirection > 0)
+        // ✅ Spawnuj w kierunku ruchu gracza
         if (this.spawnCooldown <= 0) {
-            this.checkSpawnEnemies(screenWidth);
+            this.checkSpawnEnemies(screenWidth, scrollDirection);
             this.spawnCooldown = this.spawnCooldownTime;
         }
     }
     
-    checkSpawnEnemies(screenWidth) {
+    checkSpawnEnemies(screenWidth, scrollDirection = 0) {
         const activeEnemies = this.enemies.filter(e => e.active && !e.isDying);
+        
+        // ✅ Limit maksymalnej liczby wrogów do 6
+        if (activeEnemies.length >= 6) {
+            console.log('Max enemies reached (6), skipping spawn');
+            return;
+        }
+        
         const enemyXs = activeEnemies.map(e => e.x);
         
-        // ✅ Zacznij spawning za ekranem
-        const rightmostEnemy = enemyXs.length > 0 ? 
-            Math.max(...enemyXs) : 
-            screenWidth + 200;
-        
-        // Spawn jeśli ostatni wróg wszedł na ekran
-        if (rightmostEnemy < screenWidth + this.spawnDistance) {
-            this.trySpawnEnemy(rightmostEnemy, screenWidth);
+        // ✅ Spawn w kierunku ruchu gracza
+        if (scrollDirection > 0.1) {
+            // Gracz idzie w prawo - spawn z prawej
+            const rightmostEnemy = enemyXs.length > 0 ? 
+                Math.max(...enemyXs) : 
+                screenWidth + 200;
+            
+            if (rightmostEnemy < screenWidth + this.spawnDistance) {
+                this.trySpawnEnemy(rightmostEnemy, screenWidth, 'right');
+            }
+        } else if (scrollDirection < -0.1) {
+            // Gracz idzie w lewo - spawn z lewej
+            const leftmostEnemy = enemyXs.length > 0 ? 
+                Math.min(...enemyXs) : 
+                -200;
+            
+            if (leftmostEnemy > -this.spawnDistance) {
+                this.trySpawnEnemy(leftmostEnemy, screenWidth, 'left');
+            }
+        } else {
+            // Gracz stoi - spawn z obu stron (rzadziej)
+            if (Math.random() < 0.3) { // 30% szansy gdy stoi
+                const side = Math.random() < 0.5 ? 'left' : 'right';
+                if (side === 'right') {
+                    const rightmostEnemy = enemyXs.length > 0 ? Math.max(...enemyXs) : screenWidth + 200;
+                    if (rightmostEnemy < screenWidth + this.spawnDistance) {
+                        this.trySpawnEnemy(rightmostEnemy, screenWidth, 'right');
+                    }
+                } else {
+                    const leftmostEnemy = enemyXs.length > 0 ? Math.min(...enemyXs) : -200;
+                    if (leftmostEnemy > -this.spawnDistance) {
+                        this.trySpawnEnemy(leftmostEnemy, screenWidth, 'left');
+                    }
+                }
+            }
         }
     }
     
-    trySpawnEnemy(referenceX, screenWidth) {
+    trySpawnEnemy(referenceX, screenWidth, side = 'right') {
         // Random chance to spawn
         if (Math.random() > this.enemySpawnChance) return;
         
         // Calculate spawn position
         const spacing = this.minEnemySpacing + Math.random() * (this.maxEnemySpacing - this.minEnemySpacing);
         
-        // ✅ ZAWSZE za prawą krawędzią
-        const newX = Math.max(
-            referenceX + spacing,
-            screenWidth + 100 // Minimum 100px za ekranem
-        );
+        let newX;
+        if (side === 'right') {
+            // ✅ Spawn za prawą krawędzią
+            newX = Math.max(
+                referenceX + spacing,
+                screenWidth + 100 // Minimum 100px za ekranem
+            );
+        } else {
+            // ✅ Spawn za lewą krawędzią
+            newX = Math.min(
+                referenceX - spacing,
+                -100 // Minimum 100px za lewą krawędzią
+            );
+        }
         
         // Choose random enemy type
         const enemyType = this.getRandomEnemyType();
@@ -886,7 +929,7 @@ class EnemyManager {
         const enemy = new Enemy(newX, groundY - 60, enemyType); // 60 is approximate enemy height
         
         this.enemies.push(enemy);
-        console.log(`✅ Spawned ${enemyType} at x: ${newX} (screen: ${screenWidth})`);
+        console.log(`✅ Spawned ${enemyType} at x: ${newX} (${side} side, screen: ${screenWidth})`);
     }
     
     getRandomEnemyType() {

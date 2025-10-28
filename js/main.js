@@ -67,6 +67,22 @@ class BungvoGame {
             // Handle special keys
             if (e.code === 'Escape') {
                 console.log('ESC pressed, mobile:', this.isMobile(), 'gameState:', this.gameState);
+                
+                // ✅ Skip Game Over video if playing
+                if (this.gameState === 'gameOver') {
+                    const video = document.querySelector('video');
+                    if (video) {
+                        console.log('Skipping Game Over video with ESC');
+                        video.pause();
+                        // Remove video and skip text
+                        if (video.parentNode) document.body.removeChild(video);
+                        const skipText = document.querySelector('div[style*="Click, tap or press ESC"]');
+                        if (skipText && skipText.parentNode) document.body.removeChild(skipText);
+                        this.showMenu();
+                        return;
+                    }
+                }
+                
                 // Only block ESC on mobile during gameplay, allow in menu
                 if (this.isMobile() && this.gameState === 'playing') {
                     console.log('Ignoring ESC on mobile during gameplay');
@@ -170,6 +186,14 @@ class BungvoGame {
         // This keeps player centered while world scrolls
         if (scrollDistance !== 0) {
             this.player.x -= scrollDistance;
+            
+            // ✅ ALSO adjust enemy positions to compensate for world scrolling
+            // This keeps enemies in their world positions while camera moves
+            if (this.enemyManager) {
+                this.enemyManager.enemies.forEach(enemy => {
+                    enemy.x -= scrollDistance;
+                });
+            }
         }
         
         // Update dash power bar every frame
@@ -398,12 +422,119 @@ class BungvoGame {
             this.saveHighScore();
         }
         
-        // Show game over menu
-        setTimeout(() => {
-            this.showMenu();
-        }, 1000);
+        // ✅ Play Game Over video
+        this.playGameOverVideo();
         
         console.log('Game Over!');
+    }
+    
+    playGameOverVideo() {
+        // Create video element
+        const video = document.createElement('video');
+        video.src = 'assets/GAME_over.mp4';
+        video.autoplay = true;
+        video.muted = false; // Allow sound
+        video.controls = false;
+        video.playbackRate = 1.2; // ✅ 20% faster playback
+        // ✅ Get canvas position and size for proper positioning
+        const canvas = this.canvas;
+        const canvasRect = canvas.getBoundingClientRect();
+        
+        video.style.position = 'fixed';
+        video.style.top = canvasRect.top + 'px';
+        video.style.left = canvasRect.left + 'px';
+        video.style.width = canvasRect.width + 'px';
+        video.style.height = canvasRect.height + 'px';
+        video.style.objectFit = 'cover';
+        video.style.zIndex = '9999';
+        video.style.backgroundColor = '#000';
+        
+        // ✅ Fade-in effect
+        video.style.opacity = '0';
+        video.style.transition = 'opacity 0.5s ease-in-out';
+        
+        // Create skip instruction overlay
+        const skipText = document.createElement('div');
+        skipText.innerHTML = 'Click, tap or press ESC to skip';
+        skipText.style.position = 'fixed';
+        skipText.style.bottom = '20px';
+        skipText.style.right = '20px';
+        skipText.style.color = 'white';
+        skipText.style.fontSize = '16px';
+        skipText.style.fontFamily = 'Arial, sans-serif';
+        skipText.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
+        skipText.style.zIndex = '10000';
+        skipText.style.pointerEvents = 'none';
+        
+        // ✅ Fade-in for skip text (delayed)
+        skipText.style.opacity = '0';
+        skipText.style.transition = 'opacity 0.3s ease-in-out';
+        setTimeout(() => {
+            skipText.style.opacity = '1';
+        }, 1000); // Show after 1 second
+        
+        // Add to page
+        document.body.appendChild(video);
+        document.body.appendChild(skipText);
+        
+        // ✅ Start fade-in effect when video is ready
+        video.addEventListener('loadeddata', () => {
+            setTimeout(() => {
+                video.style.opacity = '1';
+            }, 100); // Small delay for smooth effect
+        });
+        
+        // ✅ Fallback fade-in if loadeddata doesn't fire
+        setTimeout(() => {
+            video.style.opacity = '1';
+        }, 200);
+        
+        // ✅ Handle window resize to keep video aligned with canvas
+        const handleResize = () => {
+            const newCanvasRect = canvas.getBoundingClientRect();
+            video.style.top = newCanvasRect.top + 'px';
+            video.style.left = newCanvasRect.left + 'px';
+            video.style.width = newCanvasRect.width + 'px';
+            video.style.height = newCanvasRect.height + 'px';
+        };
+        
+        window.addEventListener('resize', handleResize);
+        
+        console.log('Playing Game Over video...');
+        
+        // Cleanup function
+        const cleanup = () => {
+            window.removeEventListener('resize', handleResize);
+            if (video.parentNode) document.body.removeChild(video);
+            if (skipText.parentNode) document.body.removeChild(skipText);
+        };
+        
+        // When video ends, show menu
+        video.addEventListener('ended', () => {
+            console.log('Game Over video finished');
+            cleanup();
+            this.showMenu();
+        });
+        
+        // Fallback - if video fails to load, show menu after 3 seconds
+        video.addEventListener('error', (e) => {
+            console.error('Game Over video failed to load:', e);
+            cleanup();
+            setTimeout(() => {
+                this.showMenu();
+            }, 1000);
+        });
+        
+        // Add click/touch to skip video
+        const skipVideo = () => {
+            console.log('Game Over video skipped by user');
+            video.pause();
+            cleanup();
+            this.showMenu();
+        };
+        
+        video.addEventListener('click', skipVideo);
+        video.addEventListener('touchstart', skipVideo);
     }
     
     render() {
