@@ -4,8 +4,7 @@ class World {
         this.width = width;
         this.height = height;
         
-        // Stały ground level niezależny od canvas height
-        this.GROUND_LEVEL = 600; // Stała pozycja ziemi
+        // ✅ Usuń stałą GROUND_LEVEL - używaj tylko getGroundY()
         
         // Infinite runner - no static platforms, everything scrolls
         this.coins = [];
@@ -190,6 +189,14 @@ class World {
             this.obstacleManager.updateGroundY(this.height);
         }
         
+        // ✅ Difficulty scaling - gra staje się trudniejsza z czasem
+        const difficulty = 1 + Math.floor(this.totalScrollDistance / 10000) * 0.2;
+        
+        // Przekaż difficulty do enemy managera
+        if (window.game && window.game.enemyManager) {
+            window.game.enemyManager.updateDifficulty(difficulty);
+        }
+        
         // Clouds are now handled in main.js - no longer part of world
         
         // Smooth scroll direction transition
@@ -240,7 +247,7 @@ class World {
                 if (newTotalScroll < minAllowedScroll) {
                     // Hit the left boundary - clamp to rendered area
                     scrollDistance = minAllowedScroll - this.totalScrollDistance;
-                    this.currentScrollDirection = 0; // Stop scrolling at boundary
+                    // ✅ Nie resetuj direction - pozwól na smooth stop
                 }
             }
             
@@ -405,8 +412,11 @@ class World {
                 
                 // Calculate how many tiles we need to cover the screen plus scroll offset
                 const tileWidth = texture.width * layer.scale;
-                // Proper modulo for smooth wrapping (handles negative values)
-                const normalizedScrollX = ((layer.scrollX % tileWidth) + tileWidth) % tileWidth;
+                // ✅ Prostsze rozwiązanie parallax wrapping
+                if (Math.abs(layer.scrollX) > tileWidth) {
+                    layer.scrollX = layer.scrollX % tileWidth;
+                }
+                const normalizedScrollX = layer.scrollX;
                 const startX = -normalizedScrollX;
                 const tilesNeeded = Math.ceil((this.width + tileWidth) / tileWidth) + 1; // +1 for safety
                 

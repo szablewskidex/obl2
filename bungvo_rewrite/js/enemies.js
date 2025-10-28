@@ -61,24 +61,24 @@ class Enemy {
                 this.maxHealth = 2;  // Zwiększone z 1 na 2
                 this.speed = 80;     // Zwiększone z 50 na 80
                 this.color = '#ff4444';
-                this.width = 80;  // Powiększone z 40
-                this.height = 120; // Powiększone z 60
+                this.width = 65;  // ✅ Zmniejszone z 80 (gracz ma 60)
+                this.height = 105; // ✅ Zmniejszone z 120 (gracz ma 100)
                 break;
             case 'fast':
                 this.health = 2;     // Zwiększone z 1 na 2
                 this.maxHealth = 2;  // Zwiększone z 1 na 2
                 this.speed = 140;    // Zwiększone z 100 na 140
                 this.color = '#44ff44';
-                this.width = 70;  // Powiększone z 35
-                this.height = 110; // Powiększone z 55
+                this.width = 60;  // ✅ Zmniejszone z 70 (równe graczowi)
+                this.height = 100; // ✅ Zmniejszone z 110 (równe graczowi)
                 break;
             case 'tank':
                 this.health = 5;     // Zwiększone z 3 na 5
                 this.maxHealth = 5;  // Zwiększone z 3 na 5
                 this.speed = 50;     // Zwiększone z 30 na 50
                 this.color = '#4444ff';
-                this.width = 100; // Powiększone z 50
-                this.height = 140; // Powiększone z 70
+                this.width = 80; // ✅ Zmniejszone z 100
+                this.height = 120; // ✅ Zmniejszone z 140
                 break;
         }
     }
@@ -809,9 +809,9 @@ class EnemyManager {
         this.spawnDistance = 800; // Distance ahead to spawn enemies
         this.minEnemySpacing = 200;
         this.maxEnemySpacing = 400;
-        this.enemySpawnChance = 0.08; // 8% chance per check
+        this.enemySpawnChance = 0.25; // ✅ 25% chance per check (1 wróg co ~4s)
         this.spawnCooldown = 0;
-        this.spawnCooldownTime = 1.0; // 1 second between spawn checks
+        this.spawnCooldownTime = 0.8; // ✅ 0.8 second between spawn checks
         
         // Enemy types and spawn weights
         this.enemyTypes = [
@@ -932,6 +932,17 @@ class EnemyManager {
     
     getActiveEnemies() {
         return this.enemies.filter(enemy => enemy.active);
+    }
+    
+    // ✅ Difficulty scaling - zwiększa trudność z czasem
+    updateDifficulty(difficulty) {
+        // Szybsze spawny wrogów
+        this.spawnCooldownTime = Math.max(0.3, 0.8 / difficulty);
+        
+        // Więcej wrogów (ale nie więcej niż 50%)
+        this.enemySpawnChance = Math.min(0.5, 0.25 * difficulty);
+        
+        console.log(`Difficulty: ${difficulty.toFixed(1)}, Spawn rate: ${this.enemySpawnChance.toFixed(2)}, Cooldown: ${this.spawnCooldownTime.toFixed(1)}s`);
     }
     
     clear() {
