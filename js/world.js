@@ -18,7 +18,10 @@ class World {
         this.scrollSpeed = 250; // Base scroll speed - matches player speed
         this.currentScrollDirection = 0; // Smooth scroll direction
         this.totalScrollDistance = 0; // Track total scroll distance from start
-        this.maxLeftBoundary = 0; // How far left player can go (relative to current view)
+        
+        // ✅ DODAJ: Track camera position (not total scroll)
+        this.cameraX = 0; // Current camera X position in world
+        this.minCameraX = 0; // Leftmost position camera can be (updated as player moves right)
         this.parallaxLayers = [];
         
         // Load original textures
@@ -59,6 +62,16 @@ class World {
     }
     
     setupParallaxLayers() {
+        // ✅ Detect PWA for smaller parallax assets
+        const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                     window.navigator.standalone === true;
+        const pwaScaleReduction = isPWA ? 0.8 : 1.0; // 20% smaller on PWA
+        
+        console.log('PWA detected:', isPWA, 'Scale reduction:', pwaScaleReduction);
+        
+        // ✅ Lepsze skalowanie dla mobile - wszystkie assety mniejsze na telefonie
+        const mobileScale = this.height < 600 ? 0.6 : 1.0; // 40% mniejsze na mobile
+        
         // Parallax layers WITHOUT clouds
         this.parallaxLayers = [
             {
@@ -66,7 +79,7 @@ class World {
                 texture: 'nieb',
                 speed: 0.1,  // Slowest - far background
                 y: 0,
-                scale: 1.5,  // Smaller scale for testing
+                scale: 1.5 * pwaScaleReduction * mobileScale,  // Dodatkowe zmniejszenie na mobile
                 mirroring: 1863,
                 renderType: 'texture'
             },
@@ -74,8 +87,14 @@ class World {
                 name: 'red_buildings',
                 texture: 'download',  // Red brick buildings in background - CORRECTED
                 speed: 0.4,  // Background speed
-                y: this.height * 0.05,  // Przesunięte w dół
-                scale: this.height < 600 ? 1.0 : 1.8,  // Lekko zwiększone na mobile
+                y: this.height < 500 ? this.height * 0.15 :  // Bardzo małe ekrany
+                   this.height < 600 ? this.height * 0.10 :  // Mobile
+                   this.height < 800 ? this.height * 0.05 :  // Tablet
+                   this.height * 0.05,                       // Desktop
+                scale: (this.height < 500 ? 0.6 :            // Bardzo małe ekrany
+                        this.height < 600 ? 0.8 :            // Mobile
+                        this.height < 800 ? 1.2 :            // Tablet (twój przypadek)
+                        1.8) * pwaScaleReduction,             // Desktop
                 mirroring: 900,
                 renderType: 'texture'  // Use texture rendering - NO CLIPPING
             },
@@ -83,8 +102,14 @@ class World {
                 name: 'green_trees',
                 texture: 'oblockmid',  // Green trees/bushes behind fence - CORRECTED
                 speed: 0.7,  // Closer to foreground
-                y: this.height * 0.25,  // Przesunięte w dół
-                scale: this.height < 600 ? 0.8 : 1.5,  // Lekko zwiększone na mobile
+                y: this.height < 500 ? this.height * 0.35 :  // Bardzo małe ekrany
+                   this.height < 600 ? this.height * 0.30 :  // Mobile
+                   this.height < 800 ? this.height * 0.25 :  // Tablet
+                   this.height * 0.25,                       // Desktop
+                scale: (this.height < 500 ? 0.4 :            // Bardzo małe ekrany
+                        this.height < 600 ? 0.6 :            // Mobile
+                        this.height < 800 ? 1.0 :            // Tablet (twój przypadek)
+                        1.5) * pwaScaleReduction,             // Desktop
                 mirroring: 912,
                 renderType: 'texture'  // Use texture rendering - NO HEIGHT LIMITS, NO CLIPPING
             },
@@ -92,8 +117,14 @@ class World {
                 name: 'fence_and_sidewalk',
                 texture: 'oblockfence',  // Black fence with green bushes + gray sidewalk
                 speed: 1.0,  // Full speed - foreground
-                y: this.height < 600 ? this.height - 292 : this.height * 0.50,  // Chodnik na dole na mobile
-                scale: this.height < 600 ? 1.0 : 1.8,  // Mniejsze skalowanie na mobile
+                y: this.height < 500 ? this.height - 80 :    // Bardzo małe ekrany - wyżej żeby chodnik był widoczny
+                   this.height < 600 ? this.height - 100 :   // Mobile - wyżej żeby chodnik był widoczny
+                   this.height < 800 ? this.height - 120 :   // Tablet - wyżej żeby chodnik był widoczny
+                   this.height * 0.60,                       // Desktop
+                scale: this.height < 500 ? 0.8 :             // Bardzo małe ekrany
+                       this.height < 600 ? 1.0 :             // Mobile  
+                       this.height < 800 ? 1.4 :             // Tablet (twój przypadek)
+                       1.8,                                   // Desktop
                 mirroring: 1000,
                 renderType: 'texture'
             }
@@ -189,38 +220,64 @@ class World {
             this.obstacleManager.updateGroundY(this.height);
         }
         
+        // ✅ Progressive speed scaling - infinite runner gets faster over time
+        const baseScrollSpeed = 250; // Starting speed
+        const speedIncrease = Math.floor(this.totalScrollDistance / 5000) * 25; // +25 speed every 5000 units
+        const maxSpeedIncrease = 200; // Cap at +200 speed (450 total)
+        
+        this.scrollSpeed = baseScrollSpeed + Math.min(speedIncrease, maxSpeedIncrease);
+        
         // ✅ Difficulty scaling - gra staje się trudniejsza z czasem
         const difficulty = 1 + Math.floor(this.totalScrollDistance / 10000) * 0.2;
         
-        // Przekaż difficulty do enemy managera
+        // Przekaż difficulty i scroll speed do enemy managera
         if (window.game && window.game.enemyManager) {
-            window.game.enemyManager.updateDifficulty(difficulty);
+            window.game.enemyManager.updateDifficulty(difficulty, this.scrollSpeed);
         }
+        
+        // Debug info removed to prevent spam
         
         // Clouds are now handled in main.js - no longer part of world
         
-        // Smooth scroll direction transition
+        // ✅ DEAD ZONE CAMERA SYSTEM - mniejsza martwa strefa
         let targetDirection = 0;
         const centerX = this.width * 0.5;
         const distanceFromCenter = playerX - centerX;
-        const centerThreshold = 50; // Don't center if already close
+        const deadZoneWidth = this.width * 0.15; // 15% szerokości ekranu (zmniejszone z 30%)
+        const deadZoneLeft = centerX - deadZoneWidth / 2;
+        const deadZoneRight = centerX + deadZoneWidth / 2;
         
-        // INSTANT CENTER on dash start!
+        // ✅ WYŁĄCZONE: Instant center on dash - nie teleportuj kamery podczas dash
+        // Dash nie powinien wpływać na pozycję kamery, tylko na prędkość scrollowania
         if (playerState.isDashing && playerState.dashJustStarted) {
-            // Instantly snap camera to center player
-            const instantCenterDistance = distanceFromCenter;
-            // This will be applied as scrollDistance and move player to center
-            return instantCenterDistance; // Return immediately for instant effect
+            // Nie rób nic - pozwól normalnej logice dead zone obsłużyć dash
         }
         
+        // ✅ DEAD ZONE LOGIC - mniejsza martwa strefa, lepsze działanie
         if (playerState.isWalking && playerState.walkDirection !== 0) {
-            // Player is moving - follow their direction
-            targetDirection = playerState.walkDirection;
+            // Sprawdź czy gracz jest w martwej strefie
+            if (playerX >= deadZoneLeft && playerX <= deadZoneRight) {
+                // Gracz w martwej strefie - kamera się nie rusza
+                targetDirection = 0;
+            } else {
+                // Gracz poza martwą strefą - kamera podąża
+                if (playerX < deadZoneLeft && playerState.walkDirection < 0) {
+                    // Gracz po lewej i idzie w lewo
+                    targetDirection = playerState.walkDirection;
+                } else if (playerX > deadZoneRight && playerState.walkDirection > 0) {
+                    // Gracz po prawej i idzie w prawo
+                    targetDirection = playerState.walkDirection;
+                } else {
+                    // Gracz wraca do martwej strefy - centruj
+                    targetDirection = playerX < deadZoneLeft ? 0.5 : -0.5;
+                }
+            }
         } else {
-            // Player stopped - auto-center camera
-            if (Math.abs(distanceFromCenter) > centerThreshold) {
-                // Slowly scroll to center player
-                targetDirection = distanceFromCenter > 0 ? 0.3 : -0.3; // Slow centering
+            // Gracz się zatrzymał - centruj jeśli jest poza martwą strefą
+            if (Math.abs(distanceFromCenter) > deadZoneWidth / 2 + 20) {
+                targetDirection = distanceFromCenter > 0 ? 0.3 : -0.3;
+            } else {
+                targetDirection = 0;
             }
         }
         
@@ -238,21 +295,46 @@ class World {
             const actualScrollSpeed = this.scrollSpeed * speedMultiplier;
             scrollDistance = actualScrollSpeed * deltaTime * this.currentScrollDirection;
             
-            // Check if trying to scroll left (backwards) beyond rendered area
+            // Usunięto spam logów
+            
+            // ✅ POPRAWIONA LOGIKA GRANIC - pozwól na centrowanie gracza
             if (this.currentScrollDirection < 0) {
-                // Scrolling left (backwards)
-                const newTotalScroll = this.totalScrollDistance + scrollDistance;
-                // Allow going back only to the leftmost rendered area (about 1 screen width)
-                const minAllowedScroll = Math.max(0, this.totalScrollDistance - screenWidth);
-                if (newTotalScroll < minAllowedScroll) {
-                    // Hit the left boundary - clamp to rendered area
-                    scrollDistance = minAllowedScroll - this.totalScrollDistance;
-                    // ✅ Nie resetuj direction - pozwól na smooth stop
+                // Scrolling left (moving camera right, going backwards)
+                const newCameraX = this.cameraX + scrollDistance;
+                
+                // ✅ Pozwól na centrowanie gracza nawet przy granicy
+                const isPlayerFarRight = playerX > this.width * 0.7; // Gracz po prawej stronie
+                const isCentering = Math.abs(targetDirection) < 0.5; // To jest centrowanie, nie pełny ruch
+                
+                if (newCameraX < this.minCameraX && !isPlayerFarRight) {
+                    // Blokuj tylko jeśli gracz nie jest daleko po prawej
+                    scrollDistance = this.minCameraX - this.cameraX; // Move exactly to boundary
+                    this.currentScrollDirection = 0; // Stop scrolling
+                    // Blocked backward movement
+                } else if (newCameraX < this.minCameraX && isPlayerFarRight && isCentering) {
+                    // Pozwól na ograniczone centrowanie gdy gracz jest daleko po prawej
+                    const maxCenteringDistance = Math.min(Math.abs(scrollDistance), 50); // Maksymalnie 50px centrowania
+                    scrollDistance = -maxCenteringDistance;
+                    // Limited centering applied
+                }
+            } else if (this.currentScrollDirection > 0) {
+                // Scrolling right (moving camera left, going forward)
+                const newCameraX = this.cameraX + scrollDistance;
+                
+                // ✅ Update minCameraX - track furthest right position (highest cameraX value)
+                if (newCameraX > this.minCameraX) {
+                    this.minCameraX = newCameraX;
+                    // Updated furthest right position
                 }
             }
             
-            // Update total scroll distance
-            this.totalScrollDistance += scrollDistance;
+            // Update camera position
+            this.cameraX += scrollDistance;
+            
+            // Camera position updated silently
+            
+            // Update total scroll distance (for other systems)
+            this.totalScrollDistance += Math.abs(scrollDistance);
             
             // Update parallax scrolling with smooth direction (completely exclude clouds)
             this.parallaxLayers.forEach(layer => {
@@ -653,23 +735,14 @@ class World {
     
     // Get ground level - dopasowany do rzeczywistej pozycji chodnika
     getGroundY() {
-        // Znajdź layer z chodnikiem
-        const sidewalkLayer = this.parallaxLayers.find(layer => layer.name === 'fence_and_sidewalk');
-        if (!sidewalkLayer) {
-            // Fallback jeśli nie ma layer
-            return this.height - 20;
+        // ✅ Poprawione pozycjonowanie - gracz ma stać NA chodnik
+        if (this.height < 500) {
+            return this.height - 40; // Bardzo małe ekrany
+        } else if (this.height < 600) {
+            return this.height - 50; // Mobile
+        } else if (this.height < 800) {
+            return this.height - 60; // Tablet
         }
-        
-        // Chodnik jest renderowany na określonej pozycji Y z określonym skalowaniem
-        const sidewalkLayerY = sidewalkLayer.y;
-        const layerScale = sidewalkLayer.scale;
-        const textureHeight = 292; // Wysokość oblockfence.png
-        const scaledTextureHeight = textureHeight * layerScale;
-        
-        // Chodnik (szary pas) jest w dolnej części tekstury - około 85%
-        const sidewalkOffsetInTexture = scaledTextureHeight * 0.85;
-        
-        // Oblicz rzeczywistą pozycję chodnika
-        return sidewalkLayerY + sidewalkOffsetInTexture;
+        return this.height - 80; // Desktop
     }
 }

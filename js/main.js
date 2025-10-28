@@ -40,7 +40,10 @@ class BungvoGame {
         // Initialize game objects
         this.physics = new Physics();
         this.world = new World(this.canvas.width, this.canvas.height);
-        this.player = new Player(100, this.world.getGroundY() - 100, this.physics); // Gracz na ziemi (wysokość 100px)
+        // Stwórz gracza dokładnie na poziomie ziemi - wysokość będzie responsive
+        this.player = new Player(100, 0, this.physics); // Tymczasowa pozycja Y
+        // Ustaw prawidłową pozycję Y po stworzeniu gracza (gdy już ma responsive height)
+        this.player.y = this.world.getGroundY() - this.player.height;
         this.ui = new UI();
         this.weaponSystem = new WeaponSystem();
         this.enemyManager = new EnemyManager(this.canvas.width, this.canvas.height);
@@ -65,6 +68,12 @@ class BungvoGame {
             this.keys[e.code] = true;
             
             // Handle special keys
+            if (e.code === 'KeyM' && this.gameState === 'paused') {
+                // Go to main menu from pause
+                this.showMenu();
+                return;
+            }
+            
             if (e.code === 'Escape') {
                 console.log('ESC pressed, mobile:', this.isMobile(), 'gameState:', this.gameState);
                 
@@ -173,14 +182,14 @@ class BungvoGame {
             this.ui.update(deltaTime);
         }
         
-        // Update independent clouds
-        this.updateIndependentClouds(deltaTime);
-        
         // Check collisions
         this.checkCollisions();
         
         // Update world (scrolling with auto-centering)
         const scrollDistance = this.world.update(deltaTime, playerState, this.player.x, this.canvas.width);
+        
+        // ✅ Update player speed to match world scroll speed
+        this.player.updateSpeed(this.world.scrollSpeed);
         
         // Adjust player position to compensate for world scrolling
         // This keeps player centered while world scrolls
@@ -188,13 +197,16 @@ class BungvoGame {
             this.player.x -= scrollDistance;
             
             // ✅ ALSO adjust enemy positions to compensate for world scrolling
-            // This keeps enemies in their world positions while camera moves
+            // This prevents AI from reacting to scrolling-induced position changes
             if (this.enemyManager) {
                 this.enemyManager.enemies.forEach(enemy => {
                     enemy.x -= scrollDistance;
                 });
             }
         }
+        
+        // ✅ Update independent clouds AFTER world scrolling to compensate
+        this.updateIndependentClouds(deltaTime, scrollDistance);
         
         // Update dash power bar every frame
         this.updateDashBar();
@@ -248,14 +260,8 @@ class BungvoGame {
         
         // Check bullet collisions with enemies
         if (this.enemyManager && this.weaponSystem) {
-            // Create world-to-screen converter function
-            const worldToScreen = (worldX, worldY) => {
-                // For now, return world coordinates as screen coordinates
-                // This assumes no camera offset - we'll improve this if needed
-                return { x: worldX, y: worldY };
-            };
-            
-            const enemyHits = this.enemyManager.checkBulletCollisions(this.weaponSystem.bullets, this.ui, worldToScreen);
+            // Pass world object for combat text coordinate conversion
+            const enemyHits = this.enemyManager.checkBulletCollisions(this.weaponSystem.bullets, this.ui, this.world);
             enemyHits.forEach(hit => {
                 if (hit.killed) {
                     let killScore = 50;
@@ -294,6 +300,7 @@ class BungvoGame {
         this.player.addDashPower(this.player.dashPowerPerCoin);
         
         this.updateUI();
+        this.updateDashBar(); // ✅ Priority 5 fix: Update dash UI when collecting coins
         
         console.log('Coin collected!');
     }
@@ -310,10 +317,12 @@ class BungvoGame {
         this.score += 25; // Bonus punkty za apteczkę
         this.updateUI();
         
-        // Show heal combat text
+        // Show heal combat text with world coordinates
         if (this.ui && actualHeal > 0) {
             const playerCenterX = this.player.x + this.player.width / 2;
             const playerTopY = this.player.y - 10;
+            
+            // Now using world coordinates directly - no conversion needed
             this.ui.createCombatText(playerCenterX, playerTopY, `+${actualHeal} HP`, 'bonus');
         }
         
@@ -429,13 +438,28 @@ class BungvoGame {
     }
     
     playGameOverVideo() {
-        // Create video element
+        console.log('playGameOverVideo() called');
+        
+        // ✅ Check if we're in PWA or mobile - use animated screen instead of video
+        const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                     window.navigator.standalone === true ||
+                     this.isMobile();
+        
+        if (isPWA) {
+            console.log('PWA/Mobile detected - showing animated Game Over screen');
+            this.showAnimatedGameOver();
+            return;
+        }
+        
+        // Desktop - try video
         const video = document.createElement('video');
         video.src = 'assets/GAME_over.mp4';
         video.autoplay = true;
-        video.muted = false; // Allow sound
+        video.muted = false;
         video.controls = false;
-        video.playbackRate = 1.2; // ✅ 20% faster playback
+        video.playbackRate = 1.2;
+        
+        console.log('Desktop video element created with src:', video.src);
         // ✅ Get canvas position and size for proper positioning
         const canvas = this.canvas;
         const canvasRect = canvas.getBoundingClientRect();
@@ -455,7 +479,10 @@ class BungvoGame {
         
         // Create skip instruction overlay
         const skipText = document.createElement('div');
-        skipText.innerHTML = 'Click, tap or press ESC to skip';
+        const isMobile = this.isMobile();
+        skipText.innerHTML = isMobile ? 
+            'Tap to enable sound • Tap again to skip' : 
+            'Click, tap or press ESC to skip';
         skipText.style.position = 'fixed';
         skipText.style.bottom = '20px';
         skipText.style.right = '20px';
@@ -466,28 +493,153 @@ class BungvoGame {
         skipText.style.zIndex = '10000';
         skipText.style.pointerEvents = 'none';
         
+        // ✅ Mobile sound button
+        let soundButton = null;
+        if (isMobile) {
+            soundButton = document.createElement('button');
+            soundButton.innerHTML = '🔊 Enable Sound';
+            soundButton.style.position = 'fixed';
+            soundButton.style.top = '20px';
+            soundButton.style.left = '20px';
+            soundButton.style.fontSize = '18px';
+            soundButton.style.padding = '10px 20px';
+            soundButton.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+            soundButton.style.color = 'white';
+            soundButton.style.border = '2px solid white';
+            soundButton.style.borderRadius = '10px';
+            soundButton.style.zIndex = '10000';
+            soundButton.style.cursor = 'pointer';
+            soundButton.style.opacity = '0';
+            soundButton.style.transition = 'opacity 0.3s ease-in-out';
+        }
+        
         // ✅ Fade-in for skip text (delayed)
         skipText.style.opacity = '0';
         skipText.style.transition = 'opacity 0.3s ease-in-out';
         setTimeout(() => {
             skipText.style.opacity = '1';
+            if (soundButton) {
+                soundButton.style.opacity = '1';
+            }
         }, 1000); // Show after 1 second
         
         // Add to page
         document.body.appendChild(video);
         document.body.appendChild(skipText);
+        if (soundButton) {
+            document.body.appendChild(soundButton);
+        }
+        
+        console.log('Video and UI elements added to DOM');
+        
+        // ✅ Enhanced mobile autoplay handling
+        let soundEnabled = false;
+        let skipClicks = 0;
+        
+        // ✅ Wait for video to load before trying to play
+        let videoLoaded = false;
+        let playAttempted = false;
+        
+        const attemptPlay = () => {
+            if (playAttempted) return;
+            playAttempted = true;
+            
+            console.log('Attempting to play video...');
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    console.log('Video started playing successfully');
+                    videoLoaded = true;
+                }).catch(error => {
+                    console.error('Video autoplay failed:', error);
+                    if (isMobile) {
+                        console.log('Mobile autoplay failed, showing fallback');
+                        // Don't immediately go to menu - give user time to interact
+                        video.controls = true;
+                        video.style.opacity = '1';
+                        
+                        // Show a play button overlay
+                        const playOverlay = document.createElement('div');
+                        playOverlay.innerHTML = '▶ Tap to Play Video';
+                        playOverlay.style.position = 'fixed';
+                        playOverlay.style.top = '50%';
+                        playOverlay.style.left = '50%';
+                        playOverlay.style.transform = 'translate(-50%, -50%)';
+                        playOverlay.style.fontSize = '24px';
+                        playOverlay.style.padding = '20px 40px';
+                        playOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+                        playOverlay.style.color = 'white';
+                        playOverlay.style.border = '2px solid white';
+                        playOverlay.style.borderRadius = '10px';
+                        playOverlay.style.zIndex = '10001';
+                        playOverlay.style.cursor = 'pointer';
+                        
+                        document.body.appendChild(playOverlay);
+                        
+                        playOverlay.addEventListener('click', () => {
+                            video.play();
+                            document.body.removeChild(playOverlay);
+                        });
+                    }
+                });
+            }
+        };
+        
+        // Wait for video metadata to load
+        video.addEventListener('loadedmetadata', () => {
+            console.log('Video metadata loaded');
+            setTimeout(attemptPlay, 100);
+        });
+        
+        // Fallback - try to play after 500ms even if metadata doesn't load
+        setTimeout(() => {
+            if (!playAttempted) {
+                console.log('Fallback play attempt');
+                attemptPlay();
+            }
+        }, 500);
+        
+        // Sound button handler for mobile
+        if (soundButton) {
+            soundButton.addEventListener('click', () => {
+                if (!soundEnabled) {
+                    video.muted = false;
+                    soundEnabled = true;
+                    soundButton.innerHTML = '🔇 Mute';
+                    console.log('Sound enabled on mobile');
+                } else {
+                    video.muted = true;
+                    soundEnabled = false;
+                    soundButton.innerHTML = '🔊 Enable Sound';
+                    console.log('Sound muted on mobile');
+                }
+            });
+            
+            soundButton.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+        }
         
         // ✅ Start fade-in effect when video is ready
         video.addEventListener('loadeddata', () => {
+            console.log('Video loadeddata event fired');
             setTimeout(() => {
                 video.style.opacity = '1';
             }, 100); // Small delay for smooth effect
         });
         
-        // ✅ Fallback fade-in if loadeddata doesn't fire
-        setTimeout(() => {
+        // ✅ Also fade in when video starts playing
+        video.addEventListener('play', () => {
+            console.log('Video play event fired');
             video.style.opacity = '1';
-        }, 200);
+        });
+        
+        // ✅ Fallback fade-in if events don't fire
+        setTimeout(() => {
+            console.log('Fallback fade-in triggered');
+            video.style.opacity = '1';
+        }, 1000); // Longer delay for mobile
         
         // ✅ Handle window resize to keep video aligned with canvas
         const handleResize = () => {
@@ -507,6 +659,7 @@ class BungvoGame {
             window.removeEventListener('resize', handleResize);
             if (video.parentNode) document.body.removeChild(video);
             if (skipText.parentNode) document.body.removeChild(skipText);
+            if (soundButton && soundButton.parentNode) document.body.removeChild(soundButton);
         };
         
         // When video ends, show menu
@@ -516,17 +669,55 @@ class BungvoGame {
             this.showMenu();
         });
         
-        // Fallback - if video fails to load, show menu after 3 seconds
+        // Fallback - if video fails to load, show menu after longer delay
         video.addEventListener('error', (e) => {
             console.error('Game Over video failed to load:', e);
-            cleanup();
-            setTimeout(() => {
-                this.showMenu();
-            }, 1000);
+            console.error('Video error details:', e.target.error);
+            
+            if (isMobile) {
+                // On mobile, show a message instead of immediately going to menu
+                const errorOverlay = document.createElement('div');
+                errorOverlay.innerHTML = `
+                    <div style="font-size: 24px; margin-bottom: 20px;">Video could not load</div>
+                    <button onclick="this.parentNode.parentNode.removeChild(this.parentNode); window.game.showMenu();" 
+                            style="font-size: 18px; padding: 10px 20px; background: #333; color: white; border: none; border-radius: 5px;">
+                        Continue to Menu
+                    </button>
+                `;
+                errorOverlay.style.position = 'fixed';
+                errorOverlay.style.top = '50%';
+                errorOverlay.style.left = '50%';
+                errorOverlay.style.transform = 'translate(-50%, -50%)';
+                errorOverlay.style.textAlign = 'center';
+                errorOverlay.style.padding = '30px';
+                errorOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+                errorOverlay.style.color = 'white';
+                errorOverlay.style.borderRadius = '10px';
+                errorOverlay.style.zIndex = '10002';
+                
+                document.body.appendChild(errorOverlay);
+            } else {
+                cleanup();
+                setTimeout(() => {
+                    this.showMenu();
+                }, 2000);
+            }
         });
         
-        // Add click/touch to skip video
+        // Add click/touch to skip video (with mobile sound handling)
         const skipVideo = () => {
+            if (isMobile) {
+                skipClicks++;
+                if (skipClicks === 1 && !soundEnabled) {
+                    // First tap - enable sound
+                    video.muted = false;
+                    soundEnabled = true;
+                    if (soundButton) soundButton.innerHTML = '🔇 Mute';
+                    console.log('First tap - sound enabled');
+                    return;
+                }
+            }
+            
             console.log('Game Over video skipped by user');
             video.pause();
             cleanup();
@@ -534,8 +725,151 @@ class BungvoGame {
         };
         
         video.addEventListener('click', skipVideo);
-        video.addEventListener('touchstart', skipVideo);
+        video.addEventListener('touchstart', (e) => {
+            // Prevent event bubbling to sound button
+            if (e.target === video) {
+                skipVideo();
+            }
+        });
     }
+    
+    showAnimatedGameOver() {
+        console.log('Showing animated Game Over screen for PWA/Mobile');
+        
+        // Create full-screen overlay
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = '#000';
+        overlay.style.zIndex = '9999';
+        overlay.style.display = 'flex';
+        overlay.style.flexDirection = 'column';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.style.color = 'white';
+        overlay.style.fontFamily = 'Arial, sans-serif';
+        overlay.style.textAlign = 'center';
+        overlay.style.opacity = '0';
+        overlay.style.transition = 'opacity 0.5s ease-in-out';
+        
+        // Animated GAME OVER text
+        const gameOverText = document.createElement('h1');
+        gameOverText.textContent = 'GAME OVER';
+        gameOverText.style.fontSize = '64px';
+        gameOverText.style.margin = '20px 0';
+        gameOverText.style.color = '#ff0000';
+        gameOverText.style.textShadow = '4px 4px 8px rgba(0,0,0,0.8)';
+        gameOverText.style.transform = 'scale(0)';
+        gameOverText.style.transition = 'transform 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+        
+        // Score display
+        const scoreContainer = document.createElement('div');
+        scoreContainer.style.margin = '30px 0';
+        scoreContainer.style.opacity = '0';
+        scoreContainer.style.transform = 'translateY(50px)';
+        scoreContainer.style.transition = 'all 0.6s ease-out 1.2s';
+        
+        const scoreText = document.createElement('div');
+        scoreText.innerHTML = `
+            <div style="font-size: 28px; margin: 15px 0; color: #ffd700;">Final Score: ${this.score}</div>
+            <div style="font-size: 24px; margin: 15px 0; color: #silver;">High Score: ${this.highScore}</div>
+            <div style="font-size: 20px; margin: 15px 0; color: #bronze;">Coins Collected: ${this.coinsCollected}</div>
+        `;
+        scoreContainer.appendChild(scoreText);
+        
+        // Continue button
+        const continueBtn = document.createElement('button');
+        continueBtn.textContent = 'Continue';
+        continueBtn.style.fontSize = '24px';
+        continueBtn.style.padding = '15px 40px';
+        continueBtn.style.margin = '30px 0';
+        continueBtn.style.backgroundColor = '#ff0000';
+        continueBtn.style.color = 'white';
+        continueBtn.style.border = 'none';
+        continueBtn.style.borderRadius = '10px';
+        continueBtn.style.cursor = 'pointer';
+        continueBtn.style.opacity = '0';
+        continueBtn.style.transform = 'translateY(30px)';
+        continueBtn.style.transition = 'all 0.5s ease-out 2s';
+        continueBtn.style.boxShadow = '0 4px 15px rgba(255, 0, 0, 0.3)';
+        
+        // Skip text
+        const skipText = document.createElement('div');
+        skipText.textContent = 'Tap anywhere to skip';
+        skipText.style.position = 'absolute';
+        skipText.style.bottom = '30px';
+        skipText.style.fontSize = '16px';
+        skipText.style.color = '#888';
+        skipText.style.opacity = '0';
+        skipText.style.transition = 'opacity 0.3s ease-in-out 1s';
+        
+        // Add elements to overlay
+        overlay.appendChild(gameOverText);
+        overlay.appendChild(scoreContainer);
+        overlay.appendChild(continueBtn);
+        overlay.appendChild(skipText);
+        
+        // Add to page
+        document.body.appendChild(overlay);
+        
+        // Animation sequence
+        setTimeout(() => {
+            overlay.style.opacity = '1';
+        }, 100);
+        
+        setTimeout(() => {
+            gameOverText.style.transform = 'scale(1)';
+        }, 300);
+        
+        setTimeout(() => {
+            scoreContainer.style.opacity = '1';
+            scoreContainer.style.transform = 'translateY(0)';
+        }, 1200);
+        
+        setTimeout(() => {
+            continueBtn.style.opacity = '1';
+            continueBtn.style.transform = 'translateY(0)';
+            skipText.style.opacity = '1';
+        }, 2000);
+        
+        // Auto-continue after 5 seconds
+        const autoTimeout = setTimeout(() => {
+            this.cleanupGameOver(overlay);
+        }, 5000);
+        
+        // Button handler
+        const handleContinue = () => {
+            clearTimeout(autoTimeout);
+            this.cleanupGameOver(overlay);
+        };
+        
+        continueBtn.addEventListener('click', handleContinue);
+        continueBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handleContinue();
+        });
+        
+        // Skip on tap anywhere (after 1 second to prevent accidental skips)
+        setTimeout(() => {
+            overlay.addEventListener('click', handleContinue);
+            overlay.addEventListener('touchstart', handleContinue);
+        }, 1000);
+    }
+    
+    cleanupGameOver(overlay) {
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+            if (overlay.parentNode) {
+                document.body.removeChild(overlay);
+            }
+            this.showMenu();
+        }, 500);
+    }
+    
+
     
     render() {
         // Clear canvas with dark background like original
@@ -587,7 +921,7 @@ class BungvoGame {
         
         // Render UI effects (combat texts, particles, notifications)
         if (this.ui) {
-            this.ui.render(this.ctx);
+            this.ui.render(this.ctx, this.world);
         }
         
         if (this.gameState === 'paused') {
@@ -599,7 +933,9 @@ class BungvoGame {
     }
     
     renderDebugInfo() {
-        if (!this.player || !this.world) return;
+        // ✅ Debug info disabled in production - only show in development
+        const showDebug = false; // Set to true for debugging
+        if (!showDebug || !this.player || !this.world) return;
         
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         this.ctx.fillRect(10, 100, 300, 180);
@@ -621,16 +957,26 @@ class BungvoGame {
     }
     
     renderPauseScreen() {
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
         this.ctx.fillStyle = 'white';
         this.ctx.font = '48px Arial';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText('PAUSED', this.canvas.width / 2, this.canvas.height / 2);
+        this.ctx.fillText('PAUSED', this.canvas.width / 2, this.canvas.height / 2 - 50);
         
         this.ctx.font = '24px Arial';
-        this.ctx.fillText('Press ESC to resume', this.canvas.width / 2, this.canvas.height / 2 + 50);
+        this.ctx.fillText('Press ESC to resume', this.canvas.width / 2, this.canvas.height / 2);
+        
+        // Mobile: show menu button
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (isMobile) {
+            this.ctx.font = '20px Arial';
+            this.ctx.fillText('Tap menu button (☰) to go to main menu', this.canvas.width / 2, this.canvas.height / 2 + 40);
+        } else {
+            this.ctx.font = '20px Arial';
+            this.ctx.fillText('Press M for main menu', this.canvas.width / 2, this.canvas.height / 2 + 40);
+        }
     }
     
     gameLoop(currentTime) {
@@ -660,9 +1006,10 @@ class BungvoGame {
     
     togglePause() {
         if (this.gameState === 'playing') {
-            // Show menu instead of pause screen
-            this.showMenu();
+            // Pause game - show pause screen, not main menu
+            this.gameState = 'paused';
         } else if (this.gameState === 'paused') {
+            // Resume game
             this.gameState = 'playing';
         } else if (this.gameState === 'menu') {
             // Resume game from menu
@@ -735,12 +1082,28 @@ class BungvoGame {
     }
     
     initIndependentClouds() {
+        // ✅ RESPONSIVE CLOUD SCALING - chmury skalują się z rozmiarem ekranu
+        const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                     window.navigator.standalone === true;
+        
+        // Responsive scaling based on screen height
+        const screenHeight = this.canvas.height;
+        const baseCloudScale = screenHeight < 500 ? 0.8 :  // Very small screens
+                              screenHeight < 600 ? 1.0 :  // Mobile
+                              screenHeight < 800 ? 1.4 :  // Tablet  
+                              2.0;                         // Desktop
+        
+        const pwaReduction = isPWA ? 0.8 : 1.0;
+        const cloudScale = baseCloudScale * pwaReduction;
+        
+        console.log(`Cloud responsive scaling: height=${screenHeight}, base=${baseCloudScale}, PWA=${isPWA}, final=${cloudScale.toFixed(2)}`);
+        
         // Completely independent clouds system
         this.independentClouds = {
             texture: null,
             scrollX: 0,
             y: -150,
-            scale: 2.0,
+            scale: cloudScale,
             mirroring: 550,
             speed: 50 // pixels per second - constant drift to the right, independent of player
         };
@@ -753,27 +1116,22 @@ class BungvoGame {
         img.src = 'assets/Pv8HBC.png';
     }
     
-    updateIndependentClouds(deltaTime) {
-        // Clouds move based on player direction (wind effect)
-        if (this.independentClouds && this.player) {
-            // Base speed when standing still
-            const baseSpeed = 20;
+    updateIndependentClouds(deltaTime, worldScrollDistance = 0) {
+        // ✅ Clouds always move right at constant speed (independent of player movement)
+        if (this.independentClouds) {
+            // Slower constant speed - reduced because compensation adds extra speed when moving right
+            const constantSpeed = 15; // Reduced from 30 to 15 px/s
             
-            let totalSpeed = baseSpeed;
+            // Move clouds always to the right
+            this.independentClouds.scrollX += constantSpeed * deltaTime;
             
-            if (this.player.velocityX > 10) {
-                // Moving right - add wind, move right faster
-                const windSpeed = this.player.velocityX * 0.6;
-                totalSpeed = baseSpeed + windSpeed;
-            } else if (this.player.velocityX < -10) {
-                // Moving left - reverse direction, move left
-                const windSpeed = Math.abs(this.player.velocityX) * 0.6;
-                totalSpeed = -(baseSpeed + windSpeed); // Negative = move left
+            // ✅ COMPENSATE for world scrolling to keep clouds truly independent
+            // When world scrolls right (scrollDistance > 0), clouds get pushed left
+            // We need to push them back right to maintain constant movement
+            if (worldScrollDistance !== 0) {
+                this.independentClouds.scrollX += worldScrollDistance;
+                // Cloud compensation applied
             }
-            // Standing still - just base speed to the right
-            
-            // Move clouds
-            this.independentClouds.scrollX += totalSpeed * deltaTime;
             
             // No wrapping needed - modulo in render handles it smoothly
         }
@@ -807,10 +1165,7 @@ class BungvoGame {
             );
         }
         
-        // Debug: show cloud position
-        this.ctx.fillStyle = 'rgba(255, 255, 0, 0.8)';
-        this.ctx.font = '16px Arial';
-        this.ctx.fillText(`Clouds X: ${this.independentClouds.scrollX.toFixed(1)}`, 10, 30);
+        // Debug removed to clean up display
         
         // Restore context
         this.ctx.restore();
@@ -874,7 +1229,13 @@ This uses the original Bungvo parallax system!`);
 
 function toggleMobileMenu() {
     if (window.game) {
-        window.game.togglePause();
+        if (window.game.gameState === 'paused') {
+            // From pause screen, go to main menu
+            window.game.showMenu();
+        } else {
+            // From playing, go to pause
+            window.game.togglePause();
+        }
     }
 }
 
@@ -958,5 +1319,16 @@ function handleMenuGamepad() {
     }
 }
 
-// Poll gamepad in menu
-setInterval(handleMenuGamepad, 100);
+// Poll gamepad in menu - only when needed
+let gamepadInterval = null;
+function startGamepadPolling() {
+    if (!gamepadInterval) {
+        gamepadInterval = setInterval(handleMenuGamepad, 200); // Slower polling
+    }
+}
+function stopGamepadPolling() {
+    if (gamepadInterval) {
+        clearInterval(gamepadInterval);
+        gamepadInterval = null;
+    }
+}

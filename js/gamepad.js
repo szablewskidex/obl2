@@ -38,14 +38,29 @@ class GamepadManager {
     
     setupEventListeners() {
         window.addEventListener('gamepadconnected', (e) => {
-            console.log('Gamepad connected:', e.gamepad.id);
+            console.log('🎮 Gamepad connected:', e.gamepad.id);
             this.gamepads[e.gamepad.index] = e.gamepad;
         });
         
         window.addEventListener('gamepaddisconnected', (e) => {
-            console.log('Gamepad disconnected:', e.gamepad.id);
+            console.log('🎮 Gamepad disconnected:', e.gamepad.id);
             delete this.gamepads[e.gamepad.index];
         });
+        
+        // ✅ Debug: Check for existing gamepads on startup
+        setTimeout(() => {
+            const gamepads = navigator.getGamepads();
+            let foundGamepads = 0;
+            for (let i = 0; i < gamepads.length; i++) {
+                if (gamepads[i]) {
+                    foundGamepads++;
+                    console.log(`🎮 Found existing gamepad ${i}:`, gamepads[i].id);
+                }
+            }
+            if (foundGamepads === 0) {
+                console.log('🎮 No gamepads detected. Connect a controller and press any button.');
+            }
+        }, 1000);
     }
     
     update() {
@@ -93,9 +108,19 @@ class GamepadManager {
     getVirtualKeys() {
         const keys = {};
         
+        // ✅ Debug: Check if any gamepad is connected
+        if (Object.keys(this.gamepads).length === 0) {
+            return keys; // No gamepads connected
+        }
+        
         // Movement from left stick or D-pad
         const leftStickX = this.getAxisValue(this.axes.LEFT_STICK_X);
         const leftStickY = this.getAxisValue(this.axes.LEFT_STICK_Y);
+        
+        // ✅ Debug: Log gamepad input when detected
+        if (Math.abs(leftStickX) > 0.1 || Math.abs(leftStickY) > 0.1) {
+            console.log(`🎮 Gamepad input: X=${leftStickX.toFixed(2)}, Y=${leftStickY.toFixed(2)}`);
+        }
         
         // Left/Right movement
         if (leftStickX < -this.deadzone || this.isButtonPressed(this.buttons.DPAD_LEFT)) {
@@ -112,17 +137,20 @@ class GamepadManager {
             keys['KeyW'] = true;
             keys['ArrowUp'] = true;
             keys['Space'] = true;
+            console.log('🎮 Gamepad: Jump pressed');
         }
         
         // Shoot
         if (this.isButtonPressed(this.buttons.B)) {
             keys['KeyX'] = true; // B button shoots
+            console.log('🎮 Gamepad: Shoot pressed');
         }
         
         // Dash - moved to X button
         if (this.isButtonPressed(this.buttons.X)) {
             keys['ShiftLeft'] = true;
             keys['ShiftRight'] = true;
+            console.log('🎮 Gamepad: Dash pressed');
         }
         
         // Pause/Menu - only START/SELECT buttons, not A button

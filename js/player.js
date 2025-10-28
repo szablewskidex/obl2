@@ -3,8 +3,13 @@ class Player {
     constructor(x, y, physics) {
         this.x = x;
         this.y = y;
-        this.width = 60;   // Keep width
-        this.height = 100; // Zmniejszone z 140 na 100
+        // ✅ Smaller player on PWA for better proportions
+        const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                     window.navigator.standalone === true;
+        const playerScale = isPWA ? 0.8 : 1.0; // 20% smaller on PWA
+        
+        this.width = 60 * playerScale;   // Smaller on PWA
+        this.height = 100 * playerScale; // Smaller on PWA
         this.physics = physics;
 
         // Load character atlas
@@ -28,7 +33,8 @@ class Player {
         // Physics properties - PLATFORMER with jumping
         this.velocityX = 0;
         this.velocityY = 0;
-        this.speed = 250;
+        this.baseSpeed = 250; // Base speed
+        this.speed = 250; // Current speed (will be updated)
         this.jumpPower = 450;
         this.gravity = 980;
 
@@ -116,7 +122,10 @@ class Player {
         let anyMovementKey = false;
         let walkDirection = 0;
 
-        if (keys['KeyA'] || keys['ArrowLeft']) {
+        // ✅ Add touch controls support for mobile
+        const touchStates = window.touchControls ? window.touchControls.getStates() : { left: false, right: false, jump: false, dash: false };
+        
+        if (keys['KeyA'] || keys['ArrowLeft'] || touchStates.left) {
             moveDirection = -1;
             anyMovementKey = true;
             walkDirection = -1;
@@ -124,7 +133,7 @@ class Player {
                 this.facingDirection = -1;
             }
         }
-        if (keys['KeyD'] || keys['ArrowRight']) {
+        if (keys['KeyD'] || keys['ArrowRight'] || touchStates.right) {
             moveDirection = 1;
             anyMovementKey = true;
             walkDirection = 1;
@@ -157,8 +166,8 @@ class Player {
         this.isWalking = anyMovementKey;
         this.walkDirection = walkDirection;
 
-        // Jump input with double jump detection
-        const jumpPressed = keys['KeyW'] || keys['ArrowUp'] || keys['Space'];
+        // Jump input with double jump detection (including touch)
+        const jumpPressed = keys['KeyW'] || keys['ArrowUp'] || keys['Space'] || touchStates.jump;
         const jumpJustPressed = jumpPressed && !this.jumpKeyWasPressed;
         this.jumpKeyWasPressed = jumpPressed;
 
@@ -176,8 +185,8 @@ class Player {
             }
         }
 
-        // Dash input (only trigger once per key press)
-        const dashKeyPressed = keys['ShiftLeft'] || keys['ShiftRight'];
+        // Dash input (only trigger once per key press, including touch)
+        const dashKeyPressed = keys['ShiftLeft'] || keys['ShiftRight'] || touchStates.dash;
         if (dashKeyPressed && !this.dashKeyWasPressed) {
             if (this.dashCharges > 0 && !this.isDashing) {
                 this.performDash(keys);
@@ -205,14 +214,16 @@ class Player {
     performDash(keys) {
         let dashDirection = { x: 0, y: 0 };
 
-        // Determine dash direction
-        if (keys['KeyA'] || keys['ArrowLeft']) {
+        // Determine dash direction (including touch)
+        const touchStates = window.touchControls ? window.touchControls.getStates() : { left: false, right: false, jump: false, dash: false };
+        
+        if (keys['KeyA'] || keys['ArrowLeft'] || touchStates.left) {
             dashDirection.x = -1;
-        } else if (keys['KeyD'] || keys['ArrowRight']) {
+        } else if (keys['KeyD'] || keys['ArrowRight'] || touchStates.right) {
             dashDirection.x = 1;
         }
 
-        if (keys['KeyW'] || keys['ArrowUp']) {
+        if (keys['KeyW'] || keys['ArrowUp'] || touchStates.jump) {
             dashDirection.y = -1;
         } else if (keys['KeyS'] || keys['ArrowDown']) {
             dashDirection.y = 1;
@@ -982,6 +993,16 @@ class Player {
         this.wallJumpTimer = 0;
         this.coyoteTimer = 0;
         this.jumpBufferTimer = 0;
+    }
+
+    // ✅ Update player speed based on world scroll speed
+    updateSpeed(worldScrollSpeed) {
+        // Player speed should match world scroll speed for smooth movement
+        this.speed = worldScrollSpeed;
+        
+        // Also scale jump power slightly to maintain game feel
+        const speedRatio = worldScrollSpeed / this.baseSpeed;
+        this.jumpPower = 450 * Math.min(speedRatio * 0.5 + 0.5, 1.2); // Cap at 20% increase
     }
 
     // Collision detection helpers

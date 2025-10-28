@@ -26,10 +26,12 @@ class Enemy {
         // AI behavior
         this.aiState = 'patrol'; // patrol, chase, attack, dead
         this.aiTimer = 0;
-        this.detectionRange = 200;
-        this.attackRange = 50;
+        this.detectionRange = 400; // ✅ Zwiększone z 200 na 400 - lepsze wykrywanie
+        this.attackRange = 60; // ✅ Zwiększone z 50 na 60
         this.lastAttackTime = 0;
-        this.attackCooldown = 2.0; // 2 seconds between attacks
+        this.attackCooldown = 1.5; // ✅ Zmniejszone z 2.0 na 1.5 - szybsze ataki
+        this.chaseTimeout = 0; // ✅ Nowy timer dla chase
+        this.maxChaseTime = 8.0; // ✅ Maksymalny czas goniąc (8 sekund)
         
         // Visual - powiększone bazowe rozmiary
         this.width = 80;  // Powiększone z 40
@@ -57,28 +59,33 @@ class Enemy {
     setupEnemyType(type) {
         switch(type) {
             case 'basic':
-                this.health = 2;     // Zwiększone z 1 na 2
-                this.maxHealth = 2;  // Zwiększone z 1 na 2
-                this.speed = 80;     // Zwiększone z 50 na 80
+                this.health = 2;     
+                this.maxHealth = 2;  
+                this.speed = 100;    // ✅ Zwiększone z 80 na 100 - szybsze basic
                 this.color = '#ff4444';
-                this.width = 65;  // ✅ Zmniejszone z 80 (gracz ma 60)
-                this.height = 105; // ✅ Zmniejszone z 120 (gracz ma 100)
+                this.width = 65;  
+                this.height = 105; 
+                this.detectionRange = 350; // ✅ Indywidualne zasięgi
                 break;
             case 'fast':
-                this.health = 2;     // Zwiększone z 1 na 2
-                this.maxHealth = 2;  // Zwiększone z 1 na 2
-                this.speed = 140;    // Zwiększone z 100 na 140
+                this.health = 1;     // ✅ Zmniejszone z 2 na 1 - szybkie ale słabe
+                this.maxHealth = 1;  
+                this.speed = 180;    // ✅ Zwiększone z 140 na 180 - bardzo szybkie
                 this.color = '#44ff44';
-                this.width = 60;  // ✅ Zmniejszone z 70 (równe graczowi)
-                this.height = 100; // ✅ Zmniejszone z 110 (równe graczowi)
+                this.width = 60;  
+                this.height = 100; 
+                this.detectionRange = 450; // ✅ Najlepsze wykrywanie
+                this.maxChaseTime = 12.0; // ✅ Najdłużej goni
                 break;
             case 'tank':
-                this.health = 5;     // Zwiększone z 3 na 5
-                this.maxHealth = 5;  // Zwiększone z 3 na 5
-                this.speed = 50;     // Zwiększone z 30 na 50
+                this.health = 4;     // ✅ Zmniejszone z 5 na 4
+                this.maxHealth = 4;  
+                this.speed = 70;     // ✅ Zwiększone z 50 na 70 - wolniejsze ale nie za wolne
                 this.color = '#4444ff';
-                this.width = 80; // ✅ Zmniejszone z 100
-                this.height = 120; // ✅ Zmniejszone z 140
+                this.width = 80; 
+                this.height = 120; 
+                this.detectionRange = 300; // ✅ Najkrótszy zasięg
+                this.maxChaseTime = 6.0; // ✅ Najkrócej goni
                 break;
         }
     }
@@ -122,29 +129,37 @@ class Enemy {
                     this.aiTimer = 0;
                 }
                 
-                // Detect player
+                // ✅ Detect player - bardziej agresywne wykrywanie
                 if (distanceToPlayer < this.detectionRange) {
                     this.aiState = 'chase';
                     this.aiTimer = 0;
+                    this.chaseTimeout = 0; // Reset chase timer
+                    // Enemy detected player
                 }
                 break;
                 
             case 'chase':
-                // Chase player
+                // ✅ Agresywne goniące - znacznie szybsze i wytrwalsze
                 this.direction = playerDirection;
                 this.facingDirection = this.direction;
-                this.velocityX = this.direction * this.speed * 2.0; // Znacznie szybciej podczas chase
+                this.velocityX = this.direction * this.speed * 3.0; // ✅ Zwiększone z 2.0 na 3.0 - bardzo szybkie chase
+                
+                // ✅ Zwiększ chase timeout
+                this.chaseTimeout += deltaTime;
                 
                 // Attack if close enough
                 if (distanceToPlayer < this.attackRange) {
                     this.aiState = 'attack';
                     this.aiTimer = 0;
+                    this.chaseTimeout = 0; // Reset chase timer
                 }
                 
-                // Stop chasing if player is too far
-                if (distanceToPlayer > this.detectionRange * 1.5) {
+                // ✅ Stop chasing only if VERY far or timeout
+                if (distanceToPlayer > this.detectionRange * 2.5 || this.chaseTimeout > this.maxChaseTime) {
                     this.aiState = 'patrol';
                     this.aiTimer = 0;
+                    this.chaseTimeout = 0;
+                    // Enemy stopped chasing
                 }
                 break;
                 
@@ -158,9 +173,14 @@ class Enemy {
                     this.lastAttackTime = currentTime;
                 }
                 
-                // Go back to chasing after attack
-                if (this.aiTimer > 0.5) {
-                    this.aiState = 'chase';
+                // ✅ Go back to chasing after attack - szybciej
+                if (this.aiTimer > 0.3) { // ✅ Zmniejszone z 0.5 na 0.3
+                    if (distanceToPlayer < this.detectionRange * 2.0) {
+                        this.aiState = 'chase'; // ✅ Wróć do chase jeśli gracz dalej w zasięgu
+                        this.chaseTimeout = 0;
+                    } else {
+                        this.aiState = 'patrol'; // ✅ Patrol tylko jeśli gracz bardzo daleko
+                    }
                     this.aiTimer = 0;
                 }
                 break;
@@ -175,7 +195,7 @@ class Enemy {
         );
         
         if (distance < this.attackRange && player.isVulnerable && player.isVulnerable()) {
-            console.log('Enemy attacked player!');
+            // Enemy attacked player
             // Player damage will be handled by collision system
         }
     }
@@ -208,7 +228,7 @@ class Enemy {
         }
     }
     
-    takeDamage(damage = 1, bulletY = null, ui = null, worldToScreen = null) {
+    takeDamage(damage = 1, bulletY = null, ui = null, world = null) {
         if (this.isDying) return false;
         
         // Check for headshot (bullet hit upper 30% of enemy)
@@ -226,20 +246,20 @@ class Enemy {
         
         this.health -= finalDamage;
         
-        // Create combat text if UI is available
+        // Create combat text if UI is available - convert world to screen coordinates
         if (ui) {
             const textX = this.x + this.width / 2;
             const textY = this.y;
             
             if (isHeadshot) {
-                ui.createCombatText(textX, textY, finalDamage.toString(), 'headshot', worldToScreen);
+                ui.createCombatText(textX, textY, finalDamage.toString(), 'headshot', world);
             } else {
-                ui.createCombatText(textX, textY, finalDamage.toString(), 'damage', worldToScreen);
+                ui.createCombatText(textX, textY, finalDamage.toString(), 'damage', world);
             }
         }
         
         if (this.health <= 0) {
-            this.die(ui, isHeadshot, worldToScreen);
+            this.die(ui, isHeadshot, world);
             return { killed: true, isHeadshot: isHeadshot, damage: finalDamage };
         }
         
@@ -248,13 +268,13 @@ class Enemy {
         return { killed: false, isHeadshot: isHeadshot, damage: finalDamage };
     }
     
-    die(ui = null, isHeadshot = false, worldToScreen = null) {
+    die(ui = null, isHeadshot = false, world = null) {
         this.isDying = true;
         this.deathTimer = this.deathDuration;
         this.velocityX = 0;
         this.velocityY = -200; // Small bounce up
         
-        // Create kill combat text
+        // Create kill combat text - convert world to screen coordinates
         if (ui) {
             const textX = this.x + this.width / 2;
             const textY = this.y;
@@ -264,10 +284,10 @@ class Enemy {
                 killScore += 50; // Bonus for headshot kill
             }
             
-            ui.createCombatText(textX, textY, killScore.toString(), 'kill', worldToScreen);
+            ui.createCombatText(textX, textY, killScore.toString(), 'kill', world);
         }
         
-        console.log(`Enemy ${this.type} died!`);
+        // Enemy died
     }
     
     render(ctx) {
@@ -855,15 +875,14 @@ class EnemyManager {
         
         // ✅ Limit maksymalnej liczby wrogów do 6
         if (activeEnemies.length >= 6) {
-            console.log('Max enemies reached (6), skipping spawn');
+            // Max enemies reached, skipping spawn
             return;
         }
         
         const enemyXs = activeEnemies.map(e => e.x);
         
-        // ✅ Spawn w kierunku ruchu gracza
-        if (scrollDirection > 0.1) {
-            // Gracz idzie w prawo - spawn z prawej
+        // ✅ TYLKO spawn z prawej strony (infinite runner) - Priority 2 fix
+        if (scrollDirection >= -0.1) { // Allow when moving right or standing
             const rightmostEnemy = enemyXs.length > 0 ? 
                 Math.max(...enemyXs) : 
                 screenWidth + 200;
@@ -871,32 +890,8 @@ class EnemyManager {
             if (rightmostEnemy < screenWidth + this.spawnDistance) {
                 this.trySpawnEnemy(rightmostEnemy, screenWidth, 'right');
             }
-        } else if (scrollDirection < -0.1) {
-            // Gracz idzie w lewo - spawn z lewej
-            const leftmostEnemy = enemyXs.length > 0 ? 
-                Math.min(...enemyXs) : 
-                -200;
-            
-            if (leftmostEnemy > -this.spawnDistance) {
-                this.trySpawnEnemy(leftmostEnemy, screenWidth, 'left');
-            }
-        } else {
-            // Gracz stoi - spawn z obu stron (rzadziej)
-            if (Math.random() < 0.3) { // 30% szansy gdy stoi
-                const side = Math.random() < 0.5 ? 'left' : 'right';
-                if (side === 'right') {
-                    const rightmostEnemy = enemyXs.length > 0 ? Math.max(...enemyXs) : screenWidth + 200;
-                    if (rightmostEnemy < screenWidth + this.spawnDistance) {
-                        this.trySpawnEnemy(rightmostEnemy, screenWidth, 'right');
-                    }
-                } else {
-                    const leftmostEnemy = enemyXs.length > 0 ? Math.min(...enemyXs) : -200;
-                    if (leftmostEnemy > -this.spawnDistance) {
-                        this.trySpawnEnemy(leftmostEnemy, screenWidth, 'left');
-                    }
-                }
-            }
         }
+        // NIE SPAWN z lewej - to infinite runner!
     }
     
     trySpawnEnemy(referenceX, screenWidth, side = 'right') {
@@ -929,7 +924,7 @@ class EnemyManager {
         const enemy = new Enemy(newX, groundY - 60, enemyType); // 60 is approximate enemy height
         
         this.enemies.push(enemy);
-        console.log(`✅ Spawned ${enemyType} at x: ${newX} (${side} side, screen: ${screenWidth})`);
+        // Enemy spawned
     }
     
     getRandomEnemyType() {
@@ -967,7 +962,7 @@ class EnemyManager {
         return collisions;
     }
     
-    checkBulletCollisions(bullets, ui = null, worldToScreen = null) {
+    checkBulletCollisions(bullets, ui = null, world = null) {
         const hits = [];
         
         bullets.forEach(bullet => {
@@ -976,7 +971,7 @@ class EnemyManager {
             this.enemies.forEach(enemy => {
                 if (enemy.active && !enemy.isDying && bullet.checkCollision(enemy)) {
                     bullet.active = false;
-                    const result = enemy.takeDamage(bullet.damage, bullet.y, ui, worldToScreen);
+                    const result = enemy.takeDamage(bullet.damage, bullet.y, ui, world);
                     hits.push({ enemy, ...result });
                 }
             });
@@ -990,14 +985,34 @@ class EnemyManager {
     }
     
     // ✅ Difficulty scaling - zwiększa trudność z czasem
-    updateDifficulty(difficulty) {
+    updateDifficulty(difficulty, worldScrollSpeed = 250) {
         // Szybsze spawny wrogów
         this.spawnCooldownTime = Math.max(0.3, 0.8 / difficulty);
         
         // Więcej wrogów (ale nie więcej niż 50%)
         this.enemySpawnChance = Math.min(0.5, 0.25 * difficulty);
         
-        console.log(`Difficulty: ${difficulty.toFixed(1)}, Spawn rate: ${this.enemySpawnChance.toFixed(2)}, Cooldown: ${this.spawnCooldownTime.toFixed(1)}s`);
+        // ✅ Scale enemy speeds with world scroll speed
+        const speedMultiplier = worldScrollSpeed / 250; // Base world speed is 250
+        
+        this.enemies.forEach(enemy => {
+            if (enemy.active && !enemy.isDying) {
+                // Update base speed for each enemy type
+                switch(enemy.type) {
+                    case 'basic':
+                        enemy.speed = 100 * speedMultiplier;
+                        break;
+                    case 'fast':
+                        enemy.speed = 180 * speedMultiplier;
+                        break;
+                    case 'tank':
+                        enemy.speed = 70 * speedMultiplier;
+                        break;
+                }
+            }
+        });
+        
+        // Difficulty and spawn rate updated
     }
     
     clear() {

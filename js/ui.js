@@ -14,10 +14,10 @@ class UI {
         this.updateCombatTexts(deltaTime);
     }
     
-    render(ctx) {
+    render(ctx, world = null) {
         this.renderNotifications(ctx);
         this.renderParticles(ctx);
-        this.renderCombatTexts(ctx);
+        this.renderCombatTexts(ctx, world);
     }
     
     // Notification system
@@ -280,13 +280,34 @@ class UI {
     
     // Weapon UI
     renderWeaponUI(ctx, weaponSystem) {
-        // Detect mobile and adjust sizes
-        const isMobile = ctx.canvas.width < 768;
-        const margin = isMobile ? 8 : 15;
-        const uiWidth = isMobile ? 150 : 220;
-        const uiHeight = isMobile ? 60 : 90;
-        const uiX = ctx.canvas.width - uiWidth - margin;
-        const uiY = margin + (isMobile ? 50 : 100);
+        // Detect mobile - prawdziwa detekcja mobile device
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                         window.matchMedia('(max-width: 1024px)').matches;
+        
+        // ✅ Prosta ikonka ammo dla wszystkich urządzeń
+        const ammoText = `${weaponSystem.getCurrentAmmo()}`;
+        const fontSize = isMobile ? 12 : 16;
+        const positionY = isMobile ? ctx.canvas.height - 25 : ctx.canvas.height - 30;
+        
+        ctx.save();
+        ctx.fillStyle = '#00ffff';
+        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.textAlign = 'right';
+        ctx.shadowColor = '#00ffff';
+        ctx.shadowBlur = isMobile ? 3 : 5;
+        
+        // Pokazuj reload status lub ammo
+        if (weaponSystem.isCurrentlyReloading()) {
+            const reloadPercent = Math.round(weaponSystem.getReloadPercent() * 100);
+            ctx.fillStyle = '#ff6600';
+            ctx.shadowColor = '#ff6600';
+            ctx.fillText(`🔫 RELOAD ${reloadPercent}%`, ctx.canvas.width - 5, positionY);
+        } else {
+            ctx.fillText(`🔫${ammoText}`, ctx.canvas.width - 5, positionY);
+        }
+        
+        ctx.restore();
+        return;
         
         ctx.save();
         
@@ -299,16 +320,16 @@ class UI {
         
         // Neon border with glow effect
         ctx.shadowColor = '#ff6600';
-        ctx.shadowBlur = 15;
+        ctx.shadowBlur = isMobile ? 8 : 15;
         ctx.strokeStyle = '#ff6600';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(uiX, uiY, 220, 90);
+        ctx.lineWidth = isMobile ? 1 : 2;
+        ctx.strokeRect(uiX, uiY, uiWidth, uiHeight);
         ctx.shadowBlur = 0; // Reset shadow
         
         // Inner glow effect
         ctx.strokeStyle = 'rgba(255, 102, 0, 0.3)';
         ctx.lineWidth = 1;
-        ctx.strokeRect(uiX + 2, uiY + 2, 216, 86);
+        ctx.strokeRect(uiX + 1, uiY + 1, uiWidth - 2, uiHeight - 2);
         
         // Ammo text with neon effect
         ctx.fillStyle = '#ff6600';
@@ -319,29 +340,51 @@ class UI {
         
         if (weaponSystem.isCurrentlyReloading()) {
             // Show reload progress with gangster style
-            ctx.fillText('🔫 RELOADING...', uiX + 12, uiY + 28);
+            if (isMobile) {
+                ctx.fillText('🔫', uiX + 1, uiY + 5);
+                ctx.fillText('RLD', uiX + 1, uiY + 10);
+            } else {
+                ctx.fillText('🔫 RELOADING...', uiX + 12, uiY + 28);
+            }
             
             // Reload progress bar with neon effect
             const reloadProgress = weaponSystem.getReloadPercent();
-            this.renderGangsterProgressBar(ctx, uiX + 12, uiY + 40, 196, 18, reloadProgress, '#ff0066', '#ff6600');
+            const barWidth = isMobile ? uiWidth - 2 : 196;
+            const barHeight = isMobile ? 1 : 18;
+            const barY = isMobile ? uiY + 13 : uiY + 40;
+            this.renderGangsterProgressBar(ctx, uiX + (isMobile ? 4 : 12), barY, barWidth, barHeight, reloadProgress, '#ff0066', '#ff6600');
             
-            // Reload percentage
-            ctx.font = 'bold 14px Arial Black';
-            ctx.fillStyle = '#ff0066';
-            ctx.shadowColor = '#ff0066';
-            ctx.shadowBlur = 6;
-            ctx.fillText(Math.round(reloadProgress * 100) + '%', uiX + 12, uiY + 75);
+            // Reload percentage (skip on very small mobile)
+            if (!isMobile) {
+                ctx.font = 'bold 14px Arial Black';
+                ctx.fillStyle = '#ff0066';
+                ctx.shadowColor = '#ff0066';
+                ctx.shadowBlur = 6;
+                ctx.fillText(Math.round(reloadProgress * 100) + '%', uiX + 12, uiY + 75);
+            }
         } else {
             // Show ammo count with gangster style
             const ammoText = `${weaponSystem.getCurrentAmmo()}/${weaponSystem.getMaxAmmo()}`;
-            ctx.fillText('🔫 AMMO:', uiX + 12, uiY + 28);
             
-            // Large ammo numbers
-            ctx.font = 'bold 24px Arial Black';
-            ctx.fillStyle = '#00ffff';
-            ctx.shadowColor = '#00ffff';
-            ctx.shadowBlur = 10;
-            ctx.fillText(ammoText, uiX + 12, uiY + 55);
+            if (isMobile) {
+                // Compact mobile layout
+                ctx.fillText('🔫', uiX + 1, uiY + 5);
+                ctx.font = 'bold 4px Arial Black';
+                ctx.fillStyle = '#00ffff';
+                ctx.shadowColor = '#00ffff';
+                ctx.shadowBlur = 1;
+                ctx.fillText(ammoText, uiX + 1, uiY + 10);
+            } else {
+                // Desktop layout
+                ctx.fillText('🔫 AMMO:', uiX + 12, uiY + 28);
+                
+                // Large ammo numbers
+                ctx.font = 'bold 24px Arial Black';
+                ctx.fillStyle = '#00ffff';
+                ctx.shadowColor = '#00ffff';
+                ctx.shadowBlur = 10;
+                ctx.fillText(ammoText, uiX + 12, uiY + 55);
+            }
             
             // Ammo bar with gangster colors
             const ammoProgress = weaponSystem.getAmmoPercent();
@@ -355,16 +398,21 @@ class UI {
                 glowColor = '#ff6600';
             }
             
-            this.renderGangsterProgressBar(ctx, uiX + 12, uiY + 65, 196, 12, ammoProgress, ammoColor, glowColor);
+            const barWidth = isMobile ? uiWidth - 2 : 196;
+            const barHeight = isMobile ? 1 : 12;
+            const barY = isMobile ? uiY + 13 : uiY + 65;
+            this.renderGangsterProgressBar(ctx, uiX + (isMobile ? 4 : 12), barY, barWidth, barHeight, ammoProgress, ammoColor, glowColor);
         }
         
-        // Gangster controls hint
-        ctx.font = 'bold 11px Arial Black';
-        ctx.fillStyle = '#00ffff';
-        ctx.shadowColor = '#00ffff';
-        ctx.shadowBlur = 4;
-        ctx.textAlign = 'right';
-        ctx.fillText('🔫 X/Z/SPACE: SHOOT | R: RELOAD', ctx.canvas.width - margin, ctx.canvas.height - margin);
+        // Gangster controls hint (hide on mobile to save space)
+        if (!isMobile) {
+            ctx.font = 'bold 11px Arial Black';
+            ctx.fillStyle = '#00ffff';
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 4;
+            ctx.textAlign = 'right';
+            ctx.fillText('🔫 X/Z/SPACE: SHOOT | R: RELOAD', ctx.canvas.width - margin, ctx.canvas.height - margin);
+        }
         
         ctx.restore();
     }
@@ -407,27 +455,56 @@ class UI {
     }
     
     // Combat text system
-    createCombatText(x, y, text, type = 'damage', worldToScreen = null) {
-        // Convert world coordinates to screen coordinates if converter provided
-        let screenX = x;
-        let screenY = y;
+    createCombatText(worldX, worldY, text, type = 'damage', world = null) {
+        // Check for existing identical text to stack
+        const existingText = this.combatTexts.find(t => 
+            t.text === text && 
+            t.type === type && 
+            t.life > t.maxLife - 1.0 // Only stack with recent texts (within 1 second)
+        );
         
-        if (worldToScreen && typeof worldToScreen === 'function') {
-            const screenPos = worldToScreen(x, y);
-            screenX = screenPos.x;
-            screenY = screenPos.y;
+        if (existingText) {
+            // Stack the text - increase count and reset life
+            if (!existingText.count) existingText.count = 1;
+            existingText.count++;
+            existingText.text = `${text} x${existingText.count}`;
+            existingText.life = existingText.maxLife; // Reset life
+            existingText.alpha = 1.0;
+            existingText.scale = Math.min(existingText.scale + 0.1, 1.5); // Slightly bigger when stacked
+            return;
         }
+        
+        // Get canvas dimensions for responsive positioning
+        const canvas = document.getElementById('gameCanvas');
+        const canvasWidth = canvas ? canvas.width : 1100;
+        const canvasHeight = canvas ? canvas.height : 600;
+        
+        // Create combat text in center area of screen (responsive)
+        let screenX = canvasWidth * 0.5; // Center horizontally
+        let screenY = canvasHeight * 0.4; // Upper-middle area (40% from top)
+        
+        // Add some randomness so texts don't overlap
+        screenX += (Math.random() - 0.5) * (canvasWidth * 0.3); // ±15% horizontal spread
+        screenY += (Math.random() - 0.5) * (canvasHeight * 0.2); // ±10% vertical spread
+        
+        // Keep within screen bounds with margins
+        const margin = 50;
+        screenX = Math.max(margin, Math.min(screenX, canvasWidth - margin));
+        screenY = Math.max(margin, Math.min(screenY, canvasHeight * 0.6)); // Don't go below 60% height
         
         const combatText = {
             x: screenX,
             y: screenY,
+            originalY: screenY, // Store original position
             text: text,
             type: type,
-            life: 3.5,  // Zwiększone z 2.0 na 3.5 sekundy
-            maxLife: 3.5,
-            velocityY: -80,  // Szybszy start w górę
+            life: 2.0,          // Reduced to 2 seconds total
+            maxLife: 2.0,
+            velocityY: 0,       // Start with no movement
             alpha: 1.0,
-            scale: 1.0
+            scale: 1.0,
+            phase: 'show',      // 'show' -> 'fly' -> 'fade'
+            count: 1
         };
         
         // Different colors and effects for different types
@@ -470,77 +547,99 @@ class UI {
         for (let i = this.combatTexts.length - 1; i >= 0; i--) {
             const text = this.combatTexts[i];
             
-            // Update position with smooth deceleration
-            text.y += text.velocityY * deltaTime;
-            text.velocityY += 15 * deltaTime; // Zmniejszona grawitacja dla płynniejszego ruchu
-            
             // Update life
             text.life -= deltaTime;
+            const timeElapsed = text.maxLife - text.life;
             
-            // Smooth fade out over last 1.5 seconds
-            const fadeStartTime = 1.5;
-            if (text.life < fadeStartTime) {
-                text.alpha = text.life / fadeStartTime;
+            // Phase transitions
+            if (text.phase === 'show' && timeElapsed > 1.0) {
+                // After 1 second, start flying up
+                text.phase = 'fly';
+                text.velocityY = -200; // Fast upward movement
             }
             
-            // Scale animation for headshots - pulsing effect
-            if (text.type === 'headshot' && text.life > text.maxLife - 0.5) {
-                const t = (text.maxLife - text.life) / 0.5;
-                text.scale = 1.4 + Math.sin(t * Math.PI * 6) * 0.2; // Zmniejszone z 1.5 + 0.3
+            if (text.phase === 'fly' && timeElapsed > 1.5) {
+                // After 1.5 seconds, start fading
+                text.phase = 'fade';
             }
             
-            // Scale animation for kills - growing effect
-            if (text.type === 'kill' && text.life > text.maxLife - 0.8) {
-                const t = (text.maxLife - text.life) / 0.8;
-                text.scale = 1.0 + t * 0.3; // Zmniejszone z 0.5 na 0.3
+            // Update position based on phase
+            if (text.phase === 'fly' || text.phase === 'fade') {
+                text.y += text.velocityY * deltaTime;
+                text.velocityY -= 100 * deltaTime; // Slight deceleration
             }
             
-            // Floating effect - slight horizontal drift
-            const age = text.maxLife - text.life;
-            text.x += Math.sin(age * 2) * 10 * deltaTime;
+            // Update alpha based on phase
+            if (text.phase === 'show') {
+                text.alpha = 1.0; // Fully visible
+            } else if (text.phase === 'fly') {
+                text.alpha = 1.0; // Still fully visible while flying
+            } else if (text.phase === 'fade') {
+                // Fast fade out over 0.5 seconds
+                const fadeTime = timeElapsed - 1.5;
+                text.alpha = Math.max(0, 1.0 - (fadeTime / 0.5));
+            }
+            
+            // Scale animations
+            if (text.type === 'headshot' && text.phase === 'show') {
+                // Pulsing effect for headshots during show phase
+                const pulseTime = timeElapsed * 8;
+                text.scale = 1.4 + Math.sin(pulseTime) * 0.1;
+            } else if (text.type === 'kill' && text.phase === 'show') {
+                // Growing effect for kills during show phase
+                const growTime = Math.min(timeElapsed / 0.3, 1.0);
+                text.scale = 1.0 + growTime * 0.3;
+            }
             
             // Remove expired texts
-            if (text.life <= 0) {
+            if (text.life <= 0 || text.alpha <= 0) {
                 this.combatTexts.splice(i, 1);
             }
         }
     }
     
-    renderCombatTexts(ctx) {
+    renderCombatTexts(ctx, world = null) {
+        // ✅ OPTIMIZED RENDERING - reduced shadow blur layers for better performance
         ctx.save();
         
         for (const text of this.combatTexts) {
+            // Use screen coordinates directly
+            const screenX = text.x;
+            const screenY = text.y;
+            
+            // Skip rendering if off-screen
+            if (screenX < -200 || screenX > ctx.canvas.width + 200 || 
+                screenY < -100 || screenY > ctx.canvas.height + 100) {
+                continue;
+            }
+            
             ctx.globalAlpha = text.alpha;
             
-            // Set up text style - rozmiar dostosowany do desktop
-            const fontSize = Math.round(11 * text.scale);
+            // Set up text style - responsive font size
+            const isMobile = ctx.canvas.width < 768;
+            const baseFontSize = isMobile ? 20 : 16; // Większy font żeby było lepiej widać
+            const fontSize = Math.round(baseFontSize * text.scale);
             ctx.font = `bold ${fontSize}px Arial Black`;
             ctx.textAlign = 'center';
             
-            // Multiple glow layers for better visibility
-            ctx.shadowColor = text.glowColor;
-            ctx.shadowBlur = 20;
+            // Simplified glow effect
+            ctx.shadowColor = text.glowColor || text.color;
+            ctx.shadowBlur = 10;
             
-            // Thick black outline for contrast
+            // Black outline for contrast
             ctx.strokeStyle = 'black';
-            ctx.lineWidth = Math.max(4, fontSize * 0.2);
-            ctx.strokeText(text.text, text.x, text.y);
-            
-            // Inner white outline for extra contrast
-            ctx.strokeStyle = 'white';
             ctx.lineWidth = Math.max(2, fontSize * 0.1);
-            ctx.strokeText(text.text, text.x, text.y);
+            ctx.strokeText(text.text, screenX, screenY);
             
-            // Main text with enhanced glow
-            ctx.fillStyle = text.color;
-            ctx.shadowBlur = 25;
-            ctx.fillText(text.text, text.x, text.y);
+            // Main text with color
+            ctx.fillStyle = text.color || '#ffffff';
+            ctx.fillText(text.text, screenX, screenY);
             
-            // Extra glow layer for special types
-            if (text.type === 'headshot' || text.type === 'kill') {
-                ctx.shadowBlur = 35;
-                ctx.globalAlpha = text.alpha * 0.5;
-                ctx.fillText(text.text, text.x, text.y);
+            // Extra glow for headshots
+            if (text.type === 'headshot') {
+                ctx.shadowBlur = 15;
+                ctx.globalAlpha = text.alpha * 0.4;
+                ctx.fillText(text.text, screenX, screenY);
             }
         }
         

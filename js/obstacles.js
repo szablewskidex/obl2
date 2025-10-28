@@ -387,7 +387,7 @@ class ObstacleManager {
         }
         
         this.obstacles.push(obstacle);
-        console.log(`Spawned ${obstacleType} obstacle at x: ${newX}`);
+        // Obstacle spawned
     }
     
     getRandomObstacleType() {
