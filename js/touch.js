@@ -8,6 +8,10 @@ class TouchControls {
             dash: false
         };
         
+        // ✅ FIX: Throttle dla lepszej wydajności
+        this.touchThrottle = 16; // ~60fps
+        this.lastTouchUpdate = 0;
+        
         this.setupTouchControls();
     }
     
@@ -30,32 +34,39 @@ class TouchControls {
     }
     
     setupButton(button, action) {
-        // Prevent default touch behaviors
+        // ✅ FIX: Throttled touch handlers
+        const handleTouch = (pressed) => {
+            const now = Date.now();
+            if (now - this.lastTouchUpdate < this.touchThrottle) {
+                return; // Skip if too soon
+            }
+            this.lastTouchUpdate = now;
+            
+            this.touchStates[action] = pressed;
+            button.style.opacity = pressed ? '1' : '0.6';
+        };
+        
         button.addEventListener('touchstart', (e) => {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
-            this.touchStates[action] = true;
-            button.style.opacity = '1';
+            handleTouch(true);
         }, { passive: false, capture: true });
         
         button.addEventListener('touchend', (e) => {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
-            this.touchStates[action] = false;
-            button.style.opacity = '0.6';
+            handleTouch(false);
         }, { passive: false, capture: true });
         
         button.addEventListener('touchcancel', (e) => {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
-            this.touchStates[action] = false;
-            button.style.opacity = '0.6';
+            handleTouch(false);
         }, { passive: false, capture: true });
         
-        // Prevent context menu
         button.addEventListener('contextmenu', (e) => {
             e.preventDefault();
         });

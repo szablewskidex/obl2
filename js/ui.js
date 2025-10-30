@@ -5,6 +5,9 @@ class UI {
         this.particles = [];
         this.screenShake = { x: 0, y: 0, intensity: 0, duration: 0 };
         this.combatTexts = []; // Damage numbers and combat feedback
+        this.combo = 0; // Kill combo counter
+        this.comboTimer = 0; // Time since last kill
+        this.comboResetTime = 2.0; // Reset combo after 2 seconds
     }
     
     update(deltaTime) {
@@ -12,12 +15,42 @@ class UI {
         this.updateParticles(deltaTime);
         this.updateScreenShake(deltaTime);
         this.updateCombatTexts(deltaTime);
+        this.updateCombo(deltaTime);
+    }
+    
+    updateCombo(deltaTime) {
+        if (this.combo > 0) {
+            this.comboTimer -= deltaTime;
+            if (this.comboTimer <= 0) {
+                this.combo = 0; // Reset combo
+            }
+        }
+    }
+    
+    addKillToCombo() {
+        this.combo++;
+        this.comboTimer = this.comboResetTime; // Reset timer
     }
     
     render(ctx, world = null) {
         this.renderNotifications(ctx);
         this.renderParticles(ctx);
         this.renderCombatTexts(ctx, world);
+        this.renderCombo(ctx);
+    }
+    
+    renderCombo(ctx) {
+        if (this.combo <= 0) return;
+        
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.font = '24px Arial';
+        
+        // Simple white combo text at top center
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(`COMBO: ${this.combo}x`, ctx.canvas.width / 2, 50);
+        
+        ctx.restore();
     }
     
     // Notification system
@@ -456,24 +489,6 @@ class UI {
     
     // Combat text system
     createCombatText(worldX, worldY, text, type = 'damage', world = null) {
-        // Check for existing identical text to stack
-        const existingText = this.combatTexts.find(t => 
-            t.text === text && 
-            t.type === type && 
-            t.life > t.maxLife - 1.0 // Only stack with recent texts (within 1 second)
-        );
-        
-        if (existingText) {
-            // Stack the text - increase count and reset life
-            if (!existingText.count) existingText.count = 1;
-            existingText.count++;
-            existingText.text = `${text} x${existingText.count}`;
-            existingText.life = existingText.maxLife; // Reset life
-            existingText.alpha = 1.0;
-            existingText.scale = Math.min(existingText.scale + 0.1, 1.5); // Slightly bigger when stacked
-            return;
-        }
-        
         // Get canvas dimensions for responsive positioning
         const canvas = document.getElementById('gameCanvas');
         const canvasWidth = canvas ? canvas.width : 1100;
@@ -495,50 +510,14 @@ class UI {
         const combatText = {
             x: screenX,
             y: screenY,
-            originalY: screenY, // Store original position
             text: text,
             type: type,
-            life: 2.0,          // Reduced to 2 seconds total
-            maxLife: 2.0,
-            velocityY: 0,       // Start with no movement
+            life: 1.5,
+            maxLife: 1.5,
+            velocityY: -50,
             alpha: 1.0,
-            scale: 1.0,
-            phase: 'show',      // 'show' -> 'fly' -> 'fade'
-            count: 1
+            scale: 1.0
         };
-        
-        // Different colors and effects for different types
-        switch (type) {
-            case 'damage':
-                combatText.color = '#ff0066';
-                combatText.glowColor = '#ff0066';
-                combatText.life = 2.5;
-                combatText.maxLife = 2.5;
-                break;
-            case 'headshot':
-                combatText.color = '#ff6600';
-                combatText.glowColor = '#ff6600';
-                combatText.scale = 1.4; // Zmniejszone z 1.8
-                combatText.text = 'HEADSHOT! ' + text;
-                combatText.life = 4.0; // Dłużej widoczne
-                combatText.maxLife = 4.0;
-                combatText.velocityY = -100; // Szybszy ruch w górę
-                break;
-            case 'kill':
-                combatText.color = '#00ffff';
-                combatText.glowColor = '#00ffff';
-                combatText.text = 'ELIMINATED! +' + text;
-                combatText.life = 3.5;
-                combatText.maxLife = 3.5;
-                combatText.velocityY = -90;
-                break;
-            case 'bonus':
-                combatText.color = '#FFD700';
-                combatText.glowColor = '#FFD700';
-                combatText.life = 3.0;
-                combatText.maxLife = 3.0;
-                break;
-        }
         
         this.combatTexts.push(combatText);
     }
@@ -547,98 +526,66 @@ class UI {
         for (let i = this.combatTexts.length - 1; i >= 0; i--) {
             const text = this.combatTexts[i];
             
-            // Update life
             text.life -= deltaTime;
-            const timeElapsed = text.maxLife - text.life;
+            text.y += text.velocityY * deltaTime;
             
-            // Phase transitions
-            if (text.phase === 'show' && timeElapsed > 1.0) {
-                // After 1 second, start flying up
-                text.phase = 'fly';
-                text.velocityY = -200; // Fast upward movement
-            }
-            
-            if (text.phase === 'fly' && timeElapsed > 1.5) {
-                // After 1.5 seconds, start fading
-                text.phase = 'fade';
-            }
-            
-            // Update position based on phase
-            if (text.phase === 'fly' || text.phase === 'fade') {
-                text.y += text.velocityY * deltaTime;
-                text.velocityY -= 100 * deltaTime; // Slight deceleration
-            }
-            
-            // Update alpha based on phase
-            if (text.phase === 'show') {
-                text.alpha = 1.0; // Fully visible
-            } else if (text.phase === 'fly') {
-                text.alpha = 1.0; // Still fully visible while flying
-            } else if (text.phase === 'fade') {
-                // Fast fade out over 0.5 seconds
-                const fadeTime = timeElapsed - 1.5;
-                text.alpha = Math.max(0, 1.0 - (fadeTime / 0.5));
-            }
-            
-            // Scale animations
-            if (text.type === 'headshot' && text.phase === 'show') {
-                // Pulsing effect for headshots during show phase
-                const pulseTime = timeElapsed * 8;
-                text.scale = 1.4 + Math.sin(pulseTime) * 0.1;
-            } else if (text.type === 'kill' && text.phase === 'show') {
-                // Growing effect for kills during show phase
-                const growTime = Math.min(timeElapsed / 0.3, 1.0);
-                text.scale = 1.0 + growTime * 0.3;
+            // Fade out in last 0.5 seconds
+            if (text.life < 0.5) {
+                text.alpha = text.life / 0.5;
             }
             
             // Remove expired texts
-            if (text.life <= 0 || text.alpha <= 0) {
+            if (text.life <= 0) {
                 this.combatTexts.splice(i, 1);
             }
         }
     }
     
     renderCombatTexts(ctx, world = null) {
-        // ✅ OPTIMIZED RENDERING - reduced shadow blur layers for better performance
+        // ✅ FIX: Zredukowana liczba shadow blur dla lepszej wydajności
         ctx.save();
         
+        // ✅ FIX: Batch rendering - grupuj teksty po typie
+        const textsByType = {
+            'damage': [],
+            'headshot': [],
+            'kill': [],
+            'bonus': []
+        };
+        
         for (const text of this.combatTexts) {
-            // Use screen coordinates directly
             const screenX = text.x;
             const screenY = text.y;
             
-            // Skip rendering if off-screen
+            // Skip off-screen
             if (screenX < -200 || screenX > ctx.canvas.width + 200 || 
                 screenY < -100 || screenY > ctx.canvas.height + 100) {
                 continue;
             }
             
-            ctx.globalAlpha = text.alpha;
+            if (!textsByType[text.type]) {
+                textsByType[text.type] = [];
+            }
+            textsByType[text.type].push({ text, screenX, screenY });
+        }
+        
+        // Simple white text rendering
+        const isMobile = ctx.canvas.width < 768;
+        const baseFontSize = isMobile ? 18 : 16;
+        
+        for (const type in textsByType) {
+            const texts = textsByType[type];
+            if (texts.length === 0) continue;
             
-            // Set up text style - responsive font size
-            const isMobile = ctx.canvas.width < 768;
-            const baseFontSize = isMobile ? 20 : 16; // Większy font żeby było lepiej widać
-            const fontSize = Math.round(baseFontSize * text.scale);
-            ctx.font = `bold ${fontSize}px Arial Black`;
-            ctx.textAlign = 'center';
-            
-            // Simplified glow effect
-            ctx.shadowColor = text.glowColor || text.color;
-            ctx.shadowBlur = 10;
-            
-            // Black outline for contrast
-            ctx.strokeStyle = 'black';
-            ctx.lineWidth = Math.max(2, fontSize * 0.1);
-            ctx.strokeText(text.text, screenX, screenY);
-            
-            // Main text with color
-            ctx.fillStyle = text.color || '#ffffff';
-            ctx.fillText(text.text, screenX, screenY);
-            
-            // Extra glow for headshots
-            if (text.type === 'headshot') {
-                ctx.shadowBlur = 15;
-                ctx.globalAlpha = text.alpha * 0.4;
+            for (const { text, screenX, screenY } of texts) {
+                ctx.globalAlpha = text.alpha;
+                
+                const fontSize = Math.round(baseFontSize * text.scale);
+                ctx.font = `${fontSize}px Arial`;
+                ctx.textAlign = 'center';
+                
+                // Simple white text
+                ctx.fillStyle = '#ffffff';
                 ctx.fillText(text.text, screenX, screenY);
             }
         }

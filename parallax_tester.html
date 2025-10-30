@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parallax Layer Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: white;
+            overflow: hidden;
+        }
+
+        #container {
+            display: flex;
+            height: 100vh;
+        }
+
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            background: #000;
+        }
+
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #controls {
+            width: 350px;
+            background: #2a2a2a;
+            padding: 20px;
+            overflow-y: auto;
+            border-left: 2px solid #00ffff;
+        }
+
+        h2 {
+            color: #00ffff;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 24px;
+        }
+
+        .layer-section {
+            background: #333;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            border: 1px solid #00ffff;
+        }
+
+        .layer-title {
+            color: #ff00ff;
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .control-group {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            color: #aaa;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .value-display {
+            color: #00ffff;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            background: linear-gradient(145deg, #1a1a1a, #2d2d2d);
+            border: 2px solid #00ffff;
+            color: #00ffff;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background: linear-gradient(145deg, #2d2d2d, #1a1a1a);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+        }
+
+        #code-output {
+            background: #1a1a1a;
+            padding: 15px;
+            margin-top: 15px;
+            border: 1px solid #00ffff;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .info {
+            background: #444;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #aaa;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container">
+        <div id="canvas-container">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+
+        <div id="controls">
+            <h2>🎨 PARALLAX TESTER</h2>
+
+            <div class="info">
+                Screen: <span id="screenInfo"></span><br>
+                Use sliders to adjust layers in real-time
+            </div>
+
+            <!-- Resolution Selector -->
+            <div class="layer-section">
+                <div class="layer-title">📱 RESOLUTION PRESET</div>
+                <div class="control-group">
+                    <label>Select Device:</label>
+                    <select id="resolutionSelect" style="width: 100%; padding: 8px; background: #1a1a1a; color: #00ffff; border: 1px solid #00ffff; border-radius: 3px; font-size: 14px;">
+                        <option value="custom">Custom (Current)</option>
+                        <option value="1920x1080">Desktop - 1920x1080</option>
+                        <option value="1366x768">Laptop - 1366x768</option>
+                        <option value="932x430">iPhone 14 Pro Max - 932x430</option>
+                        <option value="844x390">iPhone 12 Pro - 844x390</option>
+                        <option value="820x360">Galaxy S20 - 820x360</option>
+                        <option value="768x1024">iPad - 768x1024</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Sky Layer -->
+            <div class="layer-section">
+                <div class="layer-title">☁️ SKY (nieb.png)</div>
+                <div class="control-group">
+                    <label>Y Position: <span class="value-display" id="sky-y-val">0</span></label>
+                    <input type="range" id="sky-y" min="-200" max="200" value="0" step="10">
+                </div>
+                <div class="control-group">
+                    <label>Scale: <span class="value-display" id="sky-scale-val">1.0</span></label>
+                    <input type="range" id="sky-scale" min="0.5" max="3.0" value="1.0" step="0.1">
+                </div>
+            </div>
+
+            <!-- Red Buildings Layer -->
+            <div class="layer-section">
+                <div class="layer-title">🏢 RED BUILDINGS (download.png)</div>
+                <div class="control-group">
+                    <label>Y Position %: <span class="value-display" id="buildings-y-val">14</span>%</label>
+                    <input type="range" id="buildings-y" min="-50" max="100" value="14" step="1">
+                </div>
+                <div class="control-group">
+                    <label>Scale: <span class="value-display" id="buildings-scale-val">1.3</span></label>
+                    <input type="range" id="buildings-scale" min="0.5" max="3.0" value="1.3" step="0.1">
+                </div>
+            </div>
+
+            <!-- Green Trees Layer -->
+            <div class="layer-section">
+                <div class="layer-title">🌳 GREEN TREES (oblockmid.png)</div>
+                <div class="control-group">
+                    <label>Y Position %: <span class="value-display" id="trees-y-val">28</span>%</label>
+                    <input type="range" id="trees-y" min="-50" max="100" value="28" step="1">
+                </div>
+                <div class="control-group">
+                    <label>Scale: <span class="value-display" id="trees-scale-val">1.2</span></label>
+                    <input type="range" id="trees-scale" min="0.5" max="3.0" value="1.2" step="0.1">
+                </div>
+            </div>
+
+            <!-- Fence Layer -->
+            <div class="layer-section">
+                <div class="layer-title">🚧 FENCE (oblockfence.png)</div>
+                <div class="control-group">
+                    <label>Scale: <span class="value-display" id="fence-scale-val">1.2</span></label>
+                    <input type="range" id="fence-scale" min="0.5" max="2.5" value="1.2" step="0.1">
+                </div>
+                <div class="control-group">
+                    <label>Y Offset: <span class="value-display" id="fence-offset-val">20</span>px</label>
+                    <input type="range" id="fence-offset" min="-100" max="100" value="20" step="5">
+                </div>
+            </div>
+
+            <button onclick="copyCode()">📋 COPY CODE</button>
+            <button onclick="resetDefaults()">🔄 RESET TO DEFAULTS</button>
+
+            <div id="code-output"></div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Setup canvas
+        function setupCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            document.getElementById('screenInfo').textContent = `${canvas.width}x${canvas.height}`;
+        }
+        setupCanvas();
+        window.addEventListener('resize', setupCanvas);
+
+        // Load textures
+        const textures = {};
+        const textureList = ['nieb', 'download', 'oblockmid', 'oblockfence'];
+        let loadedCount = 0;
+
+        textureList.forEach(name => {
+            const img = new Image();
+            img.onload = () => {
+                loadedCount++;
+                console.log(`Loaded ${name}.png`);
+                if (loadedCount === textureList.length) {
+                    render();
+                }
+            };
+            img.src = `assets/${name}.png`;
+            textures[name] = img;
+        });
+
+        // Get layer config from sliders
+        function getLayerConfig() {
+            const screenHeight = canvas.height;
+
+            return {
+                sky: {
+                    y: parseInt(document.getElementById('sky-y').value),
+                    scale: parseFloat(document.getElementById('sky-scale').value)
+                },
+                buildings: {
+                    y: screenHeight * (parseInt(document.getElementById('buildings-y').value) / 100),
+                    scale: parseFloat(document.getElementById('buildings-scale').value)
+                },
+                trees: {
+                    y: screenHeight * (parseInt(document.getElementById('trees-y').value) / 100),
+                    scale: parseFloat(document.getElementById('trees-scale').value)
+                },
+                fence: {
+                    scale: parseFloat(document.getElementById('fence-scale').value),
+                    offset: parseInt(document.getElementById('fence-offset').value)
+                }
+            };
+        }
+
+        // Render function
+        function render() {
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const config = getLayerConfig();
+            const screenHeight = canvas.height;
+
+            // Calculate fence Y
+            const fenceTextureHeight = 292;
+            const fenceHeight = fenceTextureHeight * config.fence.scale;
+            const fenceY = screenHeight - fenceHeight + config.fence.offset;
+
+            // Render layers
+            const layers = [
+                { name: 'sky', texture: textures.nieb, y: config.sky.y, scale: config.sky.scale },
+                { name: 'buildings', texture: textures.download, y: config.buildings.y, scale: config.buildings.scale },
+                { name: 'trees', texture: textures.oblockmid, y: config.trees.y, scale: config.trees.scale },
+                { name: 'fence', texture: textures.oblockfence, y: fenceY, scale: config.fence.scale }
+            ];
+
+            layers.forEach(layer => {
+                if (!layer.texture || !layer.texture.complete) return;
+
+                ctx.save();
+                ctx.scale(layer.scale, layer.scale);
+                ctx.drawImage(
+                    layer.texture,
+                    0,
+                    layer.y / layer.scale
+                );
+                ctx.restore();
+
+                // Draw layer info
+                ctx.fillStyle = 'rgba(0, 255, 255, 0.7)';
+                ctx.font = '12px Arial';
+                ctx.fillText(`${layer.name}: Y=${layer.y.toFixed(0)}, Scale=${layer.scale}`, 10, layers.indexOf(layer) * 20 + 20);
+            });
+
+            // Draw ground line
+            const groundY = fenceY + fenceHeight - (fenceHeight * 0.20);
+            ctx.strokeStyle = '#ff0066';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.lineTo(canvas.width, groundY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = '#ff0066';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText(`GROUND Y: ${groundY.toFixed(1)}`, canvas.width - 150, groundY - 10);
+        }
+
+        // Update value displays
+        function updateValues() {
+            document.getElementById('sky-y-val').textContent = document.getElementById('sky-y').value;
+            document.getElementById('sky-scale-val').textContent = document.getElementById('sky-scale').value;
+            document.getElementById('buildings-y-val').textContent = document.getElementById('buildings-y').value;
+            document.getElementById('buildings-scale-val').textContent = document.getElementById('buildings-scale').value;
+            document.getElementById('trees-y-val').textContent = document.getElementById('trees-y').value;
+            document.getElementById('trees-scale-val').textContent = document.getElementById('trees-scale').value;
+            document.getElementById('fence-scale-val').textContent = document.getElementById('fence-scale').value;
+            document.getElementById('fence-offset-val').textContent = document.getElementById('fence-offset').value;
+
+            render();
+        }
+
+        // Add event listeners to all sliders
+        document.querySelectorAll('input[type="range"]').forEach(slider => {
+            slider.addEventListener('input', updateValues);
+        });
+
+        // Preset configurations for different devices
+        const presets = {
+            '1920x1080': { // Desktop
+                skyY: 0, skyScale: 1,
+                buildingsY: 3, buildingsScale: 1.4,
+                treesY: 34, treesScale: 1.3,
+                fenceScale: 1.5, fenceOffset: 25
+            },
+            '1366x768': { // Laptop
+                skyY: -40, skyScale: 1,
+                buildingsY: -23, buildingsScale: 1.3,
+                treesY: 17, treesScale: 1.2,
+                fenceScale: 1.5, fenceOffset: 25
+            },
+            '932x430': { // iPhone 14 Pro Max
+                skyY: -90, skyScale: 1,
+                buildingsY: -34, buildingsScale: 0.8,
+                treesY: 14, treesScale: 0.6,
+                fenceScale: 1.0, fenceOffset: 5
+            },
+            '844x390': { // iPhone 12 Pro (small mobile)
+                skyY: -60, skyScale: 1,
+                buildingsY: -25, buildingsScale: 0.7,
+                treesY: -5, treesScale: 0.6,
+                fenceScale: 1.0, fenceOffset: 10
+            },
+            '820x360': { // Galaxy S20 (small mobile)
+                skyY: -60, skyScale: 1,
+                buildingsY: -25, buildingsScale: 0.7,
+                treesY: -5, treesScale: 0.6,
+                fenceScale: 1.0, fenceOffset: 10
+            },
+            '768x1024': { // iPad
+                skyY: -90, skyScale: 1,
+                buildingsY: -47, buildingsScale: 0.9,
+                treesY: 3, treesScale: 0.7,
+                fenceScale: 1.2, fenceOffset: 15
+            }
+        };
+
+        // Resolution selector handler
+        document.getElementById('resolutionSelect').addEventListener('change', function(e) {
+            const value = e.target.value;
+            if (value === 'custom') return;
+            
+            const [width, height] = value.split('x').map(Number);
+            
+            // Resize canvas
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Update screen info
+            document.getElementById('screenInfo').textContent = `${width}x${height}`;
+            
+            // Apply preset values if available
+            const preset = presets[value];
+            if (preset) {
+                document.getElementById('sky-y').value = preset.skyY;
+                document.getElementById('sky-scale').value = preset.skyScale;
+                document.getElementById('buildings-y').value = preset.buildingsY;
+                document.getElementById('buildings-scale').value = preset.buildingsScale;
+                document.getElementById('trees-y').value = preset.treesY;
+                document.getElementById('trees-scale').value = preset.treesScale;
+                document.getElementById('fence-scale').value = preset.fenceScale;
+                document.getElementById('fence-offset').value = preset.fenceOffset;
+            }
+            
+            // Update all value displays
+            document.getElementById('sky-y-val').textContent = preset.skyY;
+            document.getElementById('sky-scale-val').textContent = preset.skyScale;
+            document.getElementById('buildings-y-val').textContent = preset.buildingsY;
+            document.getElementById('buildings-scale-val').textContent = preset.buildingsScale;
+            document.getElementById('trees-y-val').textContent = preset.treesY;
+            document.getElementById('trees-scale-val').textContent = preset.treesScale;
+            document.getElementById('fence-scale-val').textContent = preset.fenceScale;
+            document.getElementById('fence-offset-val').textContent = preset.fenceOffset;
+            
+            // Render with new values
+            render();
+        });
+
+        // Copy code function
+        function copyCode() {
+            const config = getLayerConfig();
+            const screenHeight = canvas.height;
+
+            const code = `// Parallax configuration for screen height: ${screenHeight}px
+setupParallaxLayers() {
+    const screenHeight = this.height;
+    
+    // Sky
+    const skyY = ${document.getElementById('sky-y').value};
+    const skyScale = ${document.getElementById('sky-scale').value};
+    
+    // Red Buildings
+    const buildingsYPercent = ${document.getElementById('buildings-y').value} / 100;
+    const buildingsY = screenHeight * buildingsYPercent;
+    const buildingsScale = ${document.getElementById('buildings-scale').value};
+    
+    // Green Trees
+    const treesYPercent = ${document.getElementById('trees-y').value} / 100;
+    const treesY = screenHeight * treesYPercent;
+    const treesScale = ${document.getElementById('trees-scale').value};
+    
+    // Fence
+    const fenceScale = ${document.getElementById('fence-scale').value};
+    const fenceOffset = ${document.getElementById('fence-offset').value};
+    const fenceTextureHeight = 292;
+    const fenceHeight = fenceTextureHeight * fenceScale;
+    const fenceY = screenHeight - fenceHeight + fenceOffset;
+    
+    this.parallaxLayers = [
+        {
+            name: 'sky',
+            texture: 'nieb',
+            speed: 0.1,
+            y: skyY,
+            scale: skyScale,
+            mirroring: 1863,
+            renderType: 'texture'
+        },
+        {
+            name: 'red_buildings',
+            texture: 'download',
+            speed: 0.4,
+            y: buildingsY,
+            scale: buildingsScale,
+            mirroring: 900,
+            renderType: 'texture'
+        },
+        {
+            name: 'green_trees',
+            texture: 'oblockmid',
+            speed: 0.7,
+            y: treesY,
+            scale: treesScale,
+            mirroring: 912,
+            renderType: 'texture'
+        },
+        {
+            name: 'fence_and_sidewalk',
+            texture: 'oblockfence',
+            speed: 1.0,
+            y: fenceY,
+            scale: fenceScale,
+            mirroring: 1000,
+            renderType: 'texture'
+        }
+    ];
+}`;
+
+            const output = document.getElementById('code-output');
+            output.style.display = 'block';
+            output.textContent = code;
+
+            // Try clipboard API first, fallback to manual selection
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(code).then(() => {
+                    alert('✅ Code copied to clipboard!');
+                }).catch(() => {
+                    // Fallback: select the text for manual copy
+                    output.select();
+                    alert('📋 Code displayed below - use Ctrl+C to copy');
+                });
+            } else {
+                // Fallback for browsers without clipboard API
+                alert('📋 Code displayed below - select and copy manually');
+            }
+        }
+
+        // Reset to defaults (current game settings)
+        function resetDefaults() {
+            document.getElementById('sky-y').value = 0;
+            document.getElementById('sky-scale').value = 1.0;
+            document.getElementById('buildings-y').value = 14;
+            document.getElementById('buildings-scale').value = 1.3;
+            document.getElementById('trees-y').value = 28;
+            document.getElementById('trees-scale').value = 1.2;
+            document.getElementById('fence-scale').value = 1.2;
+            document.getElementById('fence-offset').value = 20;
+            updateValues();
+        }
+
+        // Initial render
+        updateValues();
+    </script>
+</body>
+
+</html>

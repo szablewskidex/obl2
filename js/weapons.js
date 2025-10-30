@@ -7,128 +7,117 @@ class ShotAudioManager {
         this.audioContext = null;
         this.isLoaded = false;
         this.lastShotTime = 0;
-        this.rapidFireThreshold = 300; // 300ms - if shots are closer, cut them short
-        this.nextShotShouldBeFull = false; // Flag for last shot when releasing button
+        this.rapidFireThreshold = 300;
+        this.nextShotShouldBeFull = false;
+        
+        // ✅ FIX: Audio pool dla lepszej wydajności
+        this.audioPool = [];
+        this.audioPoolSize = 5; // Maksymalnie 5 równoczesnych dźwięków
+        this.currentAudioIndex = 0;
         
         this.initAudio();
     }
     
     async initAudio() {
         try {
-            // Check if Web Audio API is supported
             if (!window.AudioContext && !window.webkitAudioContext) {
                 console.warn('Web Audio API not supported, using fallback');
                 this.initFallbackAudio();
                 return;
             }
             
-            // Create AudioContext
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            
-            // Load and decode the shot.mp3 file
             const response = await fetch('assets/shot.mp3');
             const arrayBuffer = await response.arrayBuffer();
             this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
             
             this.isLoaded = true;
-            console.log(`Shot audio loaded successfully with Web Audio API - Duration: ${this.audioBuffer.duration.toFixed(2)}s`);
+            console.log(`Shot audio loaded - Duration: ${this.audioBuffer.duration.toFixed(2)}s`);
         } catch (error) {
-            console.error('Failed to load shot audio with Web Audio API:', error);
+            console.error('Failed to load shot audio:', error);
             this.initFallbackAudio();
         }
     }
     
     initFallbackAudio() {
-        // ✅ Fallback using HTML5 Audio for older browsers
-        // We'll create new Audio instances for each shot to allow machine gun effect
+        // ✅ FIX: Używaj audio pool zamiast tworzenia nowych obiektów
         this.useFallback = true;
         this.isLoaded = true;
-        console.log('Shot audio will use HTML5 Audio fallback (machine gun ready)');
+        
+        // Stwórz pool audio elementów
+        for (let i = 0; i < this.audioPoolSize; i++) {
+            const audio = new Audio('assets/shot.mp3');
+            audio.volume = 0.7;
+            audio.preload = 'auto';
+            this.audioPool.push(audio);
+        }
+        
+        console.log('Shot audio pool created (HTML5 Audio fallback)');
     }
     
     playShot() {
-        if (!this.isLoaded) {
-            console.warn('Shot audio not loaded yet');
-            return;
-        }
+        if (!this.isLoaded) return;
         
-        // ✅ Check if this is rapid fire (multiple shots close together)
         const currentTime = Date.now();
         const timeSinceLastShot = currentTime - this.lastShotTime;
         const isRapidFire = timeSinceLastShot < this.rapidFireThreshold && !this.nextShotShouldBeFull;
+        
         this.lastShotTime = currentTime;
         
-        // ✅ Reset the flag after using it
         if (this.nextShotShouldBeFull) {
             this.nextShotShouldBeFull = false;
         }
         
         try {
-            // ✅ Use Web Audio API if available
             if (this.audioBuffer && this.audioContext) {
-                // Resume AudioContext if suspended (required by some browsers)
                 if (this.audioContext.state === 'suspended') {
                     this.audioContext.resume();
                 }
                 
-                // Create buffer source for each shot (allows overlapping for machine gun effect)
                 const source = this.audioContext.createBufferSource();
                 source.buffer = this.audioBuffer;
                 
-                // ✅ Add slight volume variation for more realistic machine gun sound
                 const gainNode = this.audioContext.createGain();
-                gainNode.gain.value = 0.8 + (Math.random() * 0.4); // Random volume 0.8-1.2
+                gainNode.gain.value = 0.8 + (Math.random() * 0.4);
                 
-                // Connect: source -> gain -> destination
                 source.connect(gainNode);
                 gainNode.connect(this.audioContext.destination);
                 
-                // ✅ Play shot - full duration for single shots, cut short for rapid fire
                 source.start(0);
                 
-                // ✅ If rapid fire, cut the sound short to prevent echo
                 if (isRapidFire) {
                     setTimeout(() => {
-                        try {
-                            source.stop();
-                        } catch (e) {
-                            // Source might already be stopped, ignore error
-                        }
-                    }, 300); // Cut after 300ms for rapid fire (increased from 150ms)
-                    console.log('Playing rapid fire shot (Web Audio) - Cut short');
-                } else {
-                    console.log(`Playing single shot (Web Audio) - Full duration: ${this.audioBuffer.duration.toFixed(2)}s`);
+                        try { source.stop(); } catch (e) {}
+                    }, 300);
                 }
-            }
-            // ✅ Fallback to HTML5 Audio - create new instance for machine gun effect
-            else if (this.useFallback) {
-                // Create new Audio instance for each shot to allow rapid fire overlapping
-                const audio = new Audio('assets/shot.mp3');
-                // ✅ Add slight volume variation for more realistic machine gun sound
-                audio.volume = 0.6 + (Math.random() * 0.3); // Random volume 0.6-0.9
-                audio.play().catch(e => console.warn('Fallback audio play failed:', e));
+            } else if (this.useFallback) {
+                // ✅ FIX: Używaj audio pool zamiast tworzenia nowych
+                const audio = this.audioPool[this.currentAudioIndex];
+                this.currentAudioIndex = (this.currentAudioIndex + 1) % this.audioPoolSize;
                 
-                // ✅ If rapid fire, cut the sound short to prevent echo
+                // Reset audio jeśli gra
+                if (!audio.paused) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }
+                
+                audio.volume = 0.6 + (Math.random() * 0.3);
+                audio.play().catch(e => console.warn('Audio play failed:', e));
+                
                 if (isRapidFire) {
                     setTimeout(() => {
                         audio.pause();
                         audio.currentTime = 0;
-                    }, 300); // Cut after 300ms for rapid fire (increased from 150ms)
-                    console.log('Playing rapid fire shot (HTML5 Audio) - Cut short');
-                } else {
-                    console.log('Playing single shot (HTML5 Audio fallback) - Full duration');
+                    }, 300);
                 }
             }
-            
         } catch (error) {
             console.error('Error playing shot sound:', error);
         }
     }
     
     onShootingStop() {
-        // ✅ Mark that next shot should be full (when player releases and shoots again)
         this.nextShotShouldBeFull = true;
-        console.log('Shooting stopped - next shot will be full');
     }
 }
 class Bullet {
@@ -343,6 +332,10 @@ class WeaponSystem {
         const justStoppedAiming = this.wasAiming && !this.isAiming;
         if (justStoppedAiming) {
             this.shotAudio.onShootingStop();
+            // Stop player shooting animation
+            if (player.stopShooting) {
+                player.stopShooting();
+            }
         }
         this.wasAiming = this.isAiming;
         
@@ -405,6 +398,11 @@ class WeaponSystem {
     }
     
     shoot(player) {
+        // Start shooting animation on player
+        if (player.startShooting) {
+            player.startShooting();
+        }
+
         // Calculate weapon position (same as in render)
         const weaponX = player.x + player.width/2 + (this.weaponOffset.x * player.facingDirection);
         const weaponY = player.y + player.height/2 + this.weaponOffset.y;
@@ -439,11 +437,23 @@ class WeaponSystem {
             barrelY = weaponY;
         }
         
-        // Apply aim angle to bullet direction
-        const aimDirection = {
-            x: player.facingDirection,
-            y: Math.sin(this.aimAngle)
-        };
+        // Check if player is doing frontflip - shoot in rotation direction
+        let aimDirection;
+        if (player.isFlipping && player.flipRotation !== undefined) {
+            // During frontflip - shoot in the direction of rotation
+            // flipRotation goes from 0 to 2π (360 degrees)
+            const flipAngle = player.flipRotation * player.facingDirection;
+            aimDirection = {
+                x: Math.cos(flipAngle),
+                y: -Math.sin(flipAngle) // Negative because canvas Y is inverted
+            };
+        } else {
+            // Normal shooting - apply aim angle
+            aimDirection = {
+                x: player.facingDirection,
+                y: Math.sin(this.aimAngle)
+            };
+        }
         
         // Normalize direction
         const magnitude = Math.sqrt(aimDirection.x * aimDirection.x + aimDirection.y * aimDirection.y);
@@ -568,14 +578,18 @@ class WeaponSystem {
             const spriteWidth = this.weaponHandSprite.naturalWidth;
             const spriteHeight = this.weaponHandSprite.naturalHeight;
             
-            // Scale to appropriate size
-            const renderWidth = 60;
+            // ✅ Scale weapon with player size
+            const playerScale = player.height / 100; // Player base height is 100
+            const renderWidth = 60 * playerScale;
             const renderHeight = (spriteHeight / spriteWidth) * renderWidth;
+            
+            // ✅ Adjust position based on player scale
+            const offsetX = 25 * playerScale;
             
             ctx.drawImage(
                 this.weaponHandSprite,
-                0, 0, spriteWidth, spriteHeight, // Full sprite
-                weaponX + recoilOffset - 25, weaponY - renderHeight/2,
+                0, 0, spriteWidth, spriteHeight,
+                weaponX + recoilOffset - offsetX, weaponY - renderHeight/2,
                 renderWidth, renderHeight
             );
         } else {

@@ -231,60 +231,34 @@ class Enemy {
     takeDamage(damage = 1, bulletY = null, ui = null, world = null) {
         if (this.isDying) return false;
         
-        // Check for headshot (bullet hit upper 30% of enemy)
-        let isHeadshot = false;
-        if (bulletY !== null) {
-            const headZone = this.y + (this.height * 0.3);
-            isHeadshot = bulletY <= headZone;
-        }
+        this.health -= damage;
         
-        // Apply damage (double for headshot)
-        let finalDamage = damage;
-        if (isHeadshot) {
-            finalDamage *= 2;
-        }
-        
-        this.health -= finalDamage;
-        
-        // Create combat text if UI is available - convert world to screen coordinates
+        // Create simple damage text
         if (ui) {
             const textX = this.x + this.width / 2;
             const textY = this.y;
-            
-            if (isHeadshot) {
-                ui.createCombatText(textX, textY, finalDamage.toString(), 'headshot', world);
-            } else {
-                ui.createCombatText(textX, textY, finalDamage.toString(), 'damage', world);
-            }
+            ui.createCombatText(textX, textY, damage.toString(), 'damage', world);
         }
         
         if (this.health <= 0) {
-            this.die(ui, isHeadshot, world);
-            return { killed: true, isHeadshot: isHeadshot, damage: finalDamage };
+            this.die(ui, world);
+            return { killed: true, damage: damage };
         }
         
         // Flash red when hit
         this.hitFlash = 0.2;
-        return { killed: false, isHeadshot: isHeadshot, damage: finalDamage };
+        return { killed: false, damage: damage };
     }
     
-    die(ui = null, isHeadshot = false, world = null) {
+    die(ui = null, world = null) {
         this.isDying = true;
         this.deathTimer = this.deathDuration;
         this.velocityX = 0;
         this.velocityY = -200; // Small bounce up
         
-        // Create kill combat text - convert world to screen coordinates
+        // Add to combo
         if (ui) {
-            const textX = this.x + this.width / 2;
-            const textY = this.y;
-            let killScore = 100;
-            
-            if (isHeadshot) {
-                killScore += 50; // Bonus for headshot kill
-            }
-            
-            ui.createCombatText(textX, textY, killScore.toString(), 'kill', world);
+            ui.addKillToCombo();
         }
         
         // Enemy died

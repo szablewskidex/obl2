@@ -1,9 +1,31 @@
+// ✅ FIX: Throttle console logs - max 1 log per second
+const throttledLog = (() => {
+    const lastLogs = new Map();
+    return (key, message, interval = 1000) => {
+        const now = Date.now();
+        const last = lastLogs.get(key) || 0;
+        if (now - last > interval) {
+            console.log(message);
+            lastLogs.set(key, now);
+        }
+    };
+})();
+
 // Main game initialization and loop
 class BungvoGame {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         this.gameState = 'menu'; // menu, playing, paused, gameOver
+        
+        // ✅ FIX: Cache isMobile result - wywołaj TYLKO RAZ!
+        this._isMobileCache = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        console.log('isMobile cached:', this._isMobileCache);
+        
+        // ✅ DEBUG: FPS counter
+        this.fps = 0;
+        this.frameCount = 0;
+        this.lastFPSUpdate = Date.now();
         
         // Game objects
         this.player = null;
@@ -903,11 +925,10 @@ class BungvoGame {
             this.enemyManager.render(this.ctx);
         }
         
-        // Render weapon system (bullets, shell casings, weapon)
+        // Render weapon system (bullets, shell casings)
         if (this.weaponSystem && this.player) {
             this.weaponSystem.renderBullets(this.ctx);
             this.weaponSystem.renderShellCasings(this.ctx, this.world.getGroundY());
-            this.weaponSystem.renderWeapon(this.ctx, this.player);
         }
         
         // Final restore
@@ -983,6 +1004,16 @@ class BungvoGame {
         const deltaTime = (currentTime - this.lastTime) / 1000;
         this.lastTime = currentTime;
         
+        // ✅ DEBUG: FPS counter
+        this.frameCount++;
+        const now = Date.now();
+        if (now - this.lastFPSUpdate >= 1000) {
+            this.fps = this.frameCount;
+            this.frameCount = 0;
+            this.lastFPSUpdate = now;
+            console.log(`FPS: ${this.fps}`);
+        }
+        
         this.update(deltaTime);
         this.render();
         
@@ -1029,12 +1060,19 @@ class BungvoGame {
     }
     
     isMobile() {
-        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        console.log('isMobile check:', isMobileDevice, 'User Agent:', navigator.userAgent);
-        return isMobileDevice;
+        // ✅ FIX: Zastąp metodę isMobile() - używaj cache
+        return this._isMobileCache; // Zwróć z cache, NIE testuj regex!
     }
     
     updateUI() {
+        // ✅ FIX: Throttle UI updates - max 10x per second
+        const now = Date.now();
+        if (this._lastUIUpdate && now - this._lastUIUpdate < 100) {
+            return; // Skip update jeśli za wcześnie
+        }
+        this._lastUIUpdate = now;
+        
+        // Update UI elements
         document.getElementById('score').textContent = this.score;
         document.getElementById('lives').textContent = `${this.playerHP}/${this.maxHP} HP`;
         document.getElementById('coins').textContent = this.coinsCollected;
@@ -1045,13 +1083,12 @@ class BungvoGame {
         if (hpBarFill) {
             hpBarFill.style.width = hpPercent + '%';
             
-            // Change color based on HP level
             if (hpPercent > 60) {
-                hpBarFill.style.background = 'linear-gradient(90deg, #00ff00, #66ff00)'; // Green
+                hpBarFill.style.background = 'linear-gradient(90deg, #00ff00, #66ff00)';
             } else if (hpPercent > 30) {
-                hpBarFill.style.background = 'linear-gradient(90deg, #ffff00, #ff6600)'; // Yellow/Orange
+                hpBarFill.style.background = 'linear-gradient(90deg, #ffff00, #ff6600)';
             } else {
-                hpBarFill.style.background = 'linear-gradient(90deg, #ff0066, #ff0000)'; // Red
+                hpBarFill.style.background = 'linear-gradient(90deg, #ff0066, #ff0000)';
             }
         }
     }
@@ -1237,6 +1274,27 @@ function toggleMobileMenu() {
             window.game.togglePause();
         }
     }
+}
+
+// ✅ Gamepad toggle function
+function toggleGamepad() {
+    const gamepadEnabled = localStorage.getItem('gamepadEnabled') !== 'false';
+    const newState = !gamepadEnabled;
+    
+    localStorage.setItem('gamepadEnabled', newState);
+    
+    const button = document.getElementById('gamepadToggle');
+    if (button) {
+        button.textContent = newState ? 'ON' : 'OFF';
+        button.style.color = newState ? '#00ffff' : '#ff0066';
+    }
+    
+    // Update game if running
+    if (window.game && window.game.gamepadManager) {
+        window.game.gamepadManager.enabled = newState;
+    }
+    
+    console.log(`Gamepad ${newState ? 'enabled' : 'disabled'}`);
 }
 
 // Initialize game when page loads

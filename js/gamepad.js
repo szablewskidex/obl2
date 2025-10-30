@@ -5,6 +5,9 @@ class GamepadManager {
         this.deadzone = 0.2; // Dead zone for analog sticks
         this.buttonPressed = {}; // Track button press states
         
+        // ✅ Check if gamepad is enabled from settings
+        this.enabled = localStorage.getItem('gamepadEnabled') !== 'false';
+        
         // Xbox controller button mapping
         this.buttons = {
             A: 0,        // Jump
@@ -47,8 +50,13 @@ class GamepadManager {
             delete this.gamepads[e.gamepad.index];
         });
         
-        // ✅ Debug: Check for existing gamepads on startup
+        // ✅ Debug: Check for existing gamepads on startup (only if enabled)
         setTimeout(() => {
+            if (!this.enabled) {
+                console.log('🎮 Gamepad support disabled in settings');
+                return;
+            }
+            
             const gamepads = navigator.getGamepads();
             let foundGamepads = 0;
             for (let i = 0; i < gamepads.length; i++) {
@@ -64,6 +72,11 @@ class GamepadManager {
     }
     
     update() {
+        // ✅ Skip if gamepad is disabled
+        if (!this.enabled) {
+            return;
+        }
+        
         // Update gamepad states
         const gamepads = navigator.getGamepads();
         for (let i = 0; i < gamepads.length; i++) {

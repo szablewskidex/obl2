@@ -62,104 +62,136 @@ class World {
     }
     
     setupParallaxLayers() {
-        // ✅ Detect PWA for smaller parallax assets
-        const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
-                     window.navigator.standalone === true;
-        const pwaScaleReduction = isPWA ? 0.8 : 1.0; // 20% smaller on PWA
+        // Parallax configuration optimized for different screen sizes
+        const screenHeight = this.height;
+        const screenWidth = this.width;
         
-        console.log('PWA detected:', isPWA, 'Scale reduction:', pwaScaleReduction);
+        // Detect mobile by aspect ratio and screen size
+        const aspectRatio = screenWidth / screenHeight;
+        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isPortrait = aspectRatio < 1;
+        const isLandscapeMobile = aspectRatio >= 1 && aspectRatio < 2.5 && screenHeight < 500;
         
-        // ✅ Lepsze skalowanie dla mobile - wszystkie assety mniejsze na telefonie
-        const mobileScale = this.height < 600 ? 0.6 : 1.0; // 40% mniejsze na mobile
+        const isSmallMobile = (isLandscapeMobile || isPortrait) && screenHeight < 400; // Bardzo małe telefony
+        const isMobile = (isLandscapeMobile || isPortrait || isMobileDevice) && screenHeight >= 400 && screenHeight < 600; // Średnie mobile
+        const isLaptop = !isMobile && !isSmallMobile && screenWidth >= 900 && screenWidth < 1600; // Laptopy
+        const isDesktop = !isMobile && !isSmallMobile && screenWidth >= 1600; // Duże desktopy
         
-        // Parallax layers WITHOUT clouds
+        console.log(`Parallax setup: ${screenWidth}x${screenHeight}, aspect: ${aspectRatio.toFixed(2)}, isMobileDevice: ${isMobileDevice}, isSmallMobile: ${isSmallMobile}, isMobile: ${isMobile}, isLaptop: ${isLaptop}, isDesktop: ${isDesktop}`);
+        
+        // Sky
+        let skyY, buildingsYPercent, buildingsScale, treesYPercent, treesScale, fenceScale, fenceOffset;
+        
+        if (isSmallMobile) {
+            skyY = -60;
+            buildingsYPercent = -25 / 100;
+            buildingsScale = 0.7;
+            treesYPercent = -5 / 100;
+            treesScale = 0.6;
+            fenceScale = 1.0;
+            fenceOffset = 10;
+        } else if (isMobile) {
+            skyY = -90;
+            buildingsYPercent = -34 / 100;
+            buildingsScale = 0.8;
+            treesYPercent = 14 / 100;
+            treesScale = 0.6;
+            fenceScale = 1.0;
+            fenceOffset = 5;
+        } else if (isLaptop) {
+            skyY = -40;
+            buildingsYPercent = -23 / 100;
+            buildingsScale = 1.3;
+            treesYPercent = 17 / 100;
+            treesScale = 1.2;
+            fenceScale = 1.5;
+            fenceOffset = 25;
+        } else { // Desktop
+            skyY = 0;
+            buildingsYPercent = 3 / 100;
+            buildingsScale = 1.4;
+            treesYPercent = 34 / 100;
+            treesScale = 1.3;
+            fenceScale = 1.5;
+            fenceOffset = 25;
+        }
+        
+        const skyScale = 1;
+        const buildingsY = screenHeight * buildingsYPercent;
+        const treesY = screenHeight * treesYPercent;
+        const fenceTextureHeight = 292;
+        const fenceHeight = fenceTextureHeight * fenceScale;
+        const fenceY = screenHeight - fenceHeight + fenceOffset;
+        
         this.parallaxLayers = [
             {
                 name: 'sky',
                 texture: 'nieb',
-                speed: 0.1,  // Slowest - far background
-                y: 0,
-                scale: 1.5 * pwaScaleReduction * mobileScale,  // Dodatkowe zmniejszenie na mobile
+                speed: 0.1,
+                y: skyY,
+                scale: skyScale,
                 mirroring: 1863,
                 renderType: 'texture'
             },
             {
                 name: 'red_buildings',
-                texture: 'download',  // Red brick buildings in background - CORRECTED
-                speed: 0.4,  // Background speed
-                y: this.height < 500 ? this.height * 0.15 :  // Bardzo małe ekrany
-                   this.height < 600 ? this.height * 0.10 :  // Mobile
-                   this.height < 800 ? this.height * 0.05 :  // Tablet
-                   this.height * 0.05,                       // Desktop
-                scale: (this.height < 500 ? 0.6 :            // Bardzo małe ekrany
-                        this.height < 600 ? 0.8 :            // Mobile
-                        this.height < 800 ? 1.2 :            // Tablet (twój przypadek)
-                        1.8) * pwaScaleReduction,             // Desktop
+                texture: 'download',
+                speed: 0.4,
+                y: buildingsY,
+                scale: buildingsScale,
                 mirroring: 900,
-                renderType: 'texture'  // Use texture rendering - NO CLIPPING
+                renderType: 'texture'
             },
             {
                 name: 'green_trees',
-                texture: 'oblockmid',  // Green trees/bushes behind fence - CORRECTED
-                speed: 0.7,  // Closer to foreground
-                y: this.height < 500 ? this.height * 0.35 :  // Bardzo małe ekrany
-                   this.height < 600 ? this.height * 0.30 :  // Mobile
-                   this.height < 800 ? this.height * 0.25 :  // Tablet
-                   this.height * 0.25,                       // Desktop
-                scale: (this.height < 500 ? 0.4 :            // Bardzo małe ekrany
-                        this.height < 600 ? 0.6 :            // Mobile
-                        this.height < 800 ? 1.0 :            // Tablet (twój przypadek)
-                        1.5) * pwaScaleReduction,             // Desktop
+                texture: 'oblockmid',
+                speed: 0.7,
+                y: treesY,
+                scale: treesScale,
                 mirroring: 912,
-                renderType: 'texture'  // Use texture rendering - NO HEIGHT LIMITS, NO CLIPPING
+                renderType: 'texture'
             },
             {
                 name: 'fence_and_sidewalk',
-                texture: 'oblockfence',  // Black fence with green bushes + gray sidewalk
-                speed: 1.0,  // Full speed - foreground
-                y: this.height < 500 ? this.height - 80 :    // Bardzo małe ekrany - wyżej żeby chodnik był widoczny
-                   this.height < 600 ? this.height - 100 :   // Mobile - wyżej żeby chodnik był widoczny
-                   this.height < 800 ? this.height - 120 :   // Tablet - wyżej żeby chodnik był widoczny
-                   this.height * 0.60,                       // Desktop
-                scale: this.height < 500 ? 0.8 :             // Bardzo małe ekrany
-                       this.height < 600 ? 1.0 :             // Mobile  
-                       this.height < 800 ? 1.4 :             // Tablet (twój przypadek)
-                       1.8,                                   // Desktop
+                texture: 'oblockfence',
+                speed: 1.0,
+                y: fenceY,
+                scale: fenceScale,
                 mirroring: 1000,
                 renderType: 'texture'
             }
         ];
         
-        // Clouds are now handled in main.js - removed from world
-        
-        // Initialize scroll positions
         this.parallaxLayers.forEach(layer => {
             layer.scrollX = 0;
         });
     }
     
     generateScrollingContent() {
+        // ✅ FIX: Wywołaj getGroundY() tylko RAZ zamiast 20+ razy
+        const groundY = this.getGroundY();
+        
         // Generate coins that will scroll with the world
         this.coins = [];
         for (let i = 0; i < 20; i++) {
             this.coins.push({
                 x: i * 200 + Math.random() * 100,
-                y: this.getGroundY() - 100, // On gray sidewalk
-                width: 32,  // Bigger for better visibility
+                y: groundY - 50, // ✅ Niżej - bliżej chodnika (było -100)
+                width: 32,
                 height: 32,
                 collected: false,
                 scrolled: false
             });
         }
         
-        // Generate health packs with 5% chance - bardzo rzadkie
+        // Generate health packs with 5% chance
         this.healthPacks = [];
         for (let i = 0; i < 20; i++) {
-            if (Math.random() < 0.05) { // 5% szansy na spawn (zmniejszone z 20%)
+            if (Math.random() < 0.05) {
                 this.healthPacks.push({
-                    x: i * 500 + Math.random() * 200, // Znacznie bardziej rozrzucone
-                    y: this.getGroundY() - 110, // Trochę wyżej niż monety
-                    width: 40,  // Trochę większe niż monety
+                    x: i * 500 + Math.random() * 200,
+                    y: groundY - 110, // Trochę wyżej niż monety
+                    width: 40,
                     height: 40,
                     collected: false,
                     scrolled: false
@@ -384,7 +416,7 @@ class World {
                     const newX = rightmostCoin + minCoinSpacing + Math.random() * 100;
                     this.coins.push({
                         x: newX,
-                        y: this.getGroundY() - 100,
+                        y: this.getGroundY() - 50, // ✅ Niżej
                         width: 32,
                         height: 32,
                         collected: false,
@@ -402,7 +434,7 @@ class World {
                     const newX = leftmostCoin - minCoinSpacing - Math.random() * 100;
                     this.coins.push({
                         x: newX,
-                        y: this.getGroundY() - 100,
+                        y: this.getGroundY() - 50, // ✅ Niżej
                         width: 32,
                         height: 32,
                         collected: false,
@@ -482,42 +514,47 @@ class World {
     }
     
     renderParallaxLayers(ctx) {
-        // Render each parallax layer with proper scrolling
+        // ✅ FIX: Render tylko widoczne layers
         this.parallaxLayers.forEach(layer => {
-            if (layer.renderType === 'buildings') {
-                this.renderScrollingBuildings(ctx, layer);
-            } else if (layer.renderType === 'texture') {
-                const texture = this.textures[layer.texture];
-                if (!texture || !texture.complete) return;
+            if (layer.renderType !== 'texture') return;
+            
+            const texture = this.textures[layer.texture];
+            if (!texture || !texture.complete) return;
+            
+            const layerY = layer.y;
+            const tileWidth = texture.width * layer.scale;
+            const tileHeight = texture.height * layer.scale;
+            
+            // ✅ FIX: Skip jeśli layer jest poza ekranem
+            if (layerY + tileHeight < 0 || layerY > this.height) {
+                return; // Layer nie jest widoczny
+            }
+            
+            // Wrapping
+            if (Math.abs(layer.scrollX) > tileWidth) {
+                layer.scrollX = layer.scrollX % tileWidth;
+            }
+            
+            const startX = -layer.scrollX;
+            const tilesNeeded = Math.ceil((this.width + tileWidth) / tileWidth) + 1;
+            
+            // ✅ FIX: Render tylko widoczne tiles
+            for (let i = 0; i < tilesNeeded; i++) {
+                const x = startX + (i * tileWidth);
                 
-                const layerY = layer.y;
-                
-                // Calculate how many tiles we need to cover the screen plus scroll offset
-                const tileWidth = texture.width * layer.scale;
-                // ✅ Prostsze rozwiązanie parallax wrapping
-                if (Math.abs(layer.scrollX) > tileWidth) {
-                    layer.scrollX = layer.scrollX % tileWidth;
+                // Skip jeśli tile jest poza ekranem
+                if (x + tileWidth < 0 || x > this.width) {
+                    continue;
                 }
-                const normalizedScrollX = layer.scrollX;
-                const startX = -normalizedScrollX;
-                const tilesNeeded = Math.ceil((this.width + tileWidth) / tileWidth) + 1; // +1 for safety
                 
-                // Draw repeating tiles for infinite scrolling
-                for (let i = 0; i < tilesNeeded; i++) {
-                    const x = startX + (i * tileWidth);
-                    
-                    // Only draw if tile is visible
-                    if (x + tileWidth >= 0 && x <= this.width) {
-                        ctx.save();
-                        ctx.scale(layer.scale, layer.scale);
-                        ctx.drawImage(
-                            texture,
-                            x / layer.scale,
-                            layerY / layer.scale
-                        );
-                        ctx.restore();
-                    }
-                }
+                ctx.save();
+                ctx.scale(layer.scale, layer.scale);
+                ctx.drawImage(
+                    texture,
+                    x / layer.scale,
+                    layerY / layer.scale
+                );
+                ctx.restore();
             }
         });
     }
@@ -534,7 +571,9 @@ class World {
             return;
         }
         
-        const buildingHeight = this.height * 0.8;  // Taller buildings like original
+        // Adjust building height for mobile
+        const isMobile = this.width < 768;
+        const buildingHeight = this.height * (isMobile ? 0.3 : 0.8);  // Znacznie niższe budynki na mobile
         const tileWidth = texture.width * layer.scale;
         const tileHeight = texture.height * layer.scale;
         const startX = -layer.scrollX % tileWidth;
@@ -735,14 +774,41 @@ class World {
     
     // Get ground level - dopasowany do rzeczywistej pozycji chodnika
     getGroundY() {
-        // ✅ Poprawione pozycjonowanie - gracz ma stać NA chodnik
-        if (this.height < 500) {
-            return this.height - 40; // Bardzo małe ekrany
-        } else if (this.height < 600) {
-            return this.height - 50; // Mobile
-        } else if (this.height < 800) {
-            return this.height - 60; // Tablet
+        // ✅ FIX: Prostsza logika - bazuj na fence layer
+        const fenceLayer = this.parallaxLayers.find(l => l.name === 'fence_and_sidewalk');
+        if (!fenceLayer) {
+            // ✅ FIX: Throttle warning - tylko raz
+            if (!this._fenceLayerWarned) {
+                console.warn('Fence layer not found, using fallback');
+                this._fenceLayerWarned = true;
+            }
+            return this.height - 100;
         }
-        return this.height - 80; // Desktop
+        
+        const texture = this.textures['oblockfence'];
+        if (!texture || !texture.complete) {
+            // ✅ FIX: Throttle warning - tylko raz
+            if (!this._fenceTextureWarned) {
+                console.warn('Fence texture not loaded, using fallback');
+                this._fenceTextureWarned = true;
+            }
+            return this.height - 100;
+        }
+        
+        // ✅ Oblicz pozycję chodnika
+        // Fence sprite: 1863x292px, chodnik to dolne ~20% (58px z 292px)
+        const fenceHeight = texture.height * fenceLayer.scale;
+        const sidewalkRatio = 0.20; // 20% to chodnik
+        const sidewalkHeight = fenceHeight * sidewalkRatio;
+        
+        // Ground Y to górna krawędź chodnika
+        const groundY = fenceLayer.y + fenceHeight - sidewalkHeight;
+        
+        // ✅ FIX: Log tylko raz po załadowaniu texture
+        if (!this._groundYLogged) {
+            console.log(`GroundY calculated: ${groundY.toFixed(1)} (fence.y=${fenceLayer.y}, scale=${fenceLayer.scale})`);
+            this._groundYLogged = true;
+        }
+        return groundY;
     }
 }
