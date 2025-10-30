@@ -9,11 +9,11 @@ class Player {
         let scale;
         
         if (screenHeight < 450) {
-            scale = 0.75; // Bardzo małe telefony: 67.5x112.5
+            scale = 0.95; // Bardzo małe telefony: 85.5x142.5 (zwiększone z 0.75)
         } else if (screenHeight < 600) {
-            scale = 0.85; // Średnie mobile (iPhone 14 Pro Max): 76.5x127.5
+            scale = 1.05; // Średnie mobile (iPhone 14 Pro Max): 94.5x157.5 (zwiększone z 0.85)
         } else if (screenHeight < 900) {
-            scale = 1.0; // Tablety: 90x150
+            scale = 1.15; // Tablety: 103.5x172.5 (zwiększone z 1.0)
         } else {
             scale = 1.3; // Desktop: 117x195
         }
@@ -162,6 +162,12 @@ class Player {
         this.shootDrawDuration = 0.15; // 3 klatki * 0.05s = wyciągnięcie broni
         this.shootFireFrameDuration = 0.08; // Czas na jedną klatkę strzału (wolniejszy loop)
         this.shootTimer = 0;
+        
+        // Speed boost when running and shooting
+        this.shootRunBoostActive = false;
+        this.shootRunBoostTimer = 0;
+        this.shootRunBoostDuration = 3.0; // 3 seconds
+        this.shootRunBoostMultiplier = 1.5; // 50% speed increase
 
         // Animation
         this.animationState = 'idle'; // idle, running, jumping, wallSliding, dashing, shooting
@@ -184,7 +190,8 @@ class Player {
             isWalking: this.isWalking,
             walkDirection: this.walkDirection,
             isDashing: this.isDashing,
-            dashJustStarted: this.dashJustStarted
+            dashJustStarted: this.dashJustStarted,
+            shootRunBoostActive: this.shootRunBoostActive
         };
 
         // Reset dashJustStarted after returning it
@@ -227,7 +234,12 @@ class Player {
                 const atRightEdge = this.x + this.width >= world.width && moveDirection > 0;
 
                 if (!atLeftEdge && !atRightEdge) {
-                    this.velocityX = moveDirection * this.speed;
+                    // Apply speed boost if running and shooting
+                    let speedMultiplier = 1.0;
+                    if (this.isShooting && this.shootRunBoostActive) {
+                        speedMultiplier = this.shootRunBoostMultiplier;
+                    }
+                    this.velocityX = moveDirection * this.speed * speedMultiplier;
                 } else {
                     this.velocityX = 0;
                 }
@@ -379,6 +391,26 @@ class Player {
                 this.performJump();
             }
         }
+        
+        // Speed boost when running and shooting
+        const isMoving = Math.abs(this.velocityX) > 10;
+        if (this.isShooting && isMoving && this.onGround) {
+            // Activate boost
+            if (!this.shootRunBoostActive) {
+                this.shootRunBoostActive = true;
+                this.shootRunBoostTimer = this.shootRunBoostDuration;
+                console.log('🏃💨 Speed boost activated!');
+            }
+        }
+        
+        // Update boost timer
+        if (this.shootRunBoostActive) {
+            this.shootRunBoostTimer -= deltaTime;
+            if (this.shootRunBoostTimer <= 0) {
+                this.shootRunBoostActive = false;
+                console.log('🏃 Speed boost ended');
+            }
+        }
 
         // Wall jump timer
         if (this.wallJumpTimer > 0) {
@@ -436,9 +468,20 @@ class Player {
     }
 
     applyPhysics(deltaTime, world) {
-        // Apply gravity
+        // Apply gravity (increased during flip ending)
         if (!this.onGround && !this.isDashing) {
-            this.velocityY += this.gravity * deltaTime;
+            let gravityMultiplier = 1.0;
+            
+            // Increase gravity during last 3 frames of frontflip (faster descent)
+            if (this.isFlipping) {
+                const progress = 1 - (this.flipTimer / this.flipDuration);
+                if (progress > 0.7) {
+                    // Last 30% of flip - increase gravity by 2x
+                    gravityMultiplier = 2.0;
+                }
+            }
+            
+            this.velocityY += this.gravity * gravityMultiplier * deltaTime;
         }
 
         // Apply velocity
@@ -570,9 +613,20 @@ class Player {
         if (this.isShooting && this.isFlipping) {
             // Strzelanie podczas frontflipa - specjalna animacja
             this.animationState = 'shootingFlip';
-            // Użyj klatek z frontflipa dla synchronizacji
+            // Użyj klatek z frontflipa dla synchronizacji z przyspieszonym zakończeniem
             const progress = 1 - (this.flipTimer / this.flipDuration);
-            this.animationFrame = Math.min(Math.floor(progress * 7.99), 7);
+            
+            // Non-linear progression: first 5 frames take 70% of time, last 3 frames take 30%
+            let frameProgress;
+            if (progress < 0.7) {
+                // Frames 0-4 (first 5 frames) - slower
+                frameProgress = (progress / 0.7) * 5; // 0 to 5
+            } else {
+                // Frames 5-7 (last 3 frames) - faster
+                frameProgress = 5 + ((progress - 0.7) / 0.3) * 3; // 5 to 8
+            }
+            
+            this.animationFrame = Math.min(Math.floor(frameProgress), 7); // Clamp to 0-7
         } else if (this.isShooting) {
             this.animationState = 'shooting';
             
@@ -593,9 +647,20 @@ class Player {
             }
         } else if (this.isFlipping) {
             this.animationState = 'flipping';
-            // Calculate flip animation frame (8 frames over flip duration)
+            // Calculate flip animation frame with accelerated ending (last 3 frames faster)
             const progress = 1 - (this.flipTimer / this.flipDuration);
-            this.animationFrame = Math.min(Math.floor(progress * 7.99), 7); // Smooth progression through 8 frames (0-7)
+            
+            // Non-linear progression: first 5 frames take 70% of time, last 3 frames take 30%
+            let frameProgress;
+            if (progress < 0.7) {
+                // Frames 0-4 (first 5 frames) - slower
+                frameProgress = (progress / 0.7) * 5; // 0 to 5
+            } else {
+                // Frames 5-7 (last 3 frames) - faster
+                frameProgress = 5 + ((progress - 0.7) / 0.3) * 3; // 5 to 8
+            }
+            
+            this.animationFrame = Math.min(Math.floor(frameProgress), 7); // Clamp to 0-7
         } else if (this.isDashing) {
             this.animationState = 'dashing';
             this.animationFrame = 0;
@@ -635,6 +700,35 @@ class Player {
 
         ctx.restore();
 
+        // Draw speed boost indicator
+        if (this.shootRunBoostActive) {
+            const boostPercent = this.shootRunBoostTimer / this.shootRunBoostDuration;
+            const barWidth = 60;
+            const barHeight = 6;
+            const barX = this.x + (this.width - barWidth) / 2;
+            const barY = this.y - 15;
+            
+            // Background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+            
+            // Boost bar
+            ctx.fillStyle = `rgba(255, 200, 0, ${0.5 + boostPercent * 0.5})`;
+            ctx.fillRect(barX, barY, barWidth * boostPercent, barHeight);
+            
+            // Border
+            ctx.strokeStyle = '#ffcc00';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(barX, barY, barWidth, barHeight);
+            
+            // Text
+            ctx.fillStyle = '#ffcc00';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('⚡BOOST', this.x + this.width / 2, barY - 3);
+            ctx.textAlign = 'left';
+        }
+        
         // Draw debug info
         if (false) { // Set to true for debugging
             this.drawDebugInfo(ctx);
@@ -659,15 +753,27 @@ class Player {
             y = 0;
         }
 
-        // Use shooting during frontflip animation
+        // Use shooting during frontflip animation with smooth rotation
         if (this.animationState === 'shootingFlip' && this.shootFrontLoaded && this.shootFrontFrameWidth) {
+            ctx.save();
+            
+            // Calculate smooth rotation (full 360° rotation)
+            const progress = 1 - (this.flipTimer / this.flipDuration);
+            const rotation = progress * Math.PI * 2; // 0 to 2π (360°)
+            
+            // Rotate around center of sprite
+            ctx.translate(x + this.width / 2, y + this.height / 2);
+            ctx.rotate(rotation);
+            
             ctx.drawImage(
                 this.shootFrontSheet,
                 this.animationFrame * this.shootFrontFrameWidth, 0, // Source X, Y
                 this.shootFrontFrameWidth, this.shootFrontFrameHeight, // Source width, height
-                x, y, // Destination X, Y
+                -this.width / 2, -this.height / 2, // Centered destination X, Y
                 this.width, this.height // Destination width, height
             );
+            
+            ctx.restore();
         } else if (this.animationState === 'shooting') {
             // Check if player is moving to use appropriate animation
             const isMoving = Math.abs(this.velocityX) > 10;
@@ -692,14 +798,26 @@ class Player {
                 );
             }
         } else if (this.animationState === 'flipping' && this.frontflipLoaded && this.frontflipFrameWidth) {
-            // Use frontflip animation when flipping
+            // Use frontflip animation with smooth rotation interpolation
+            ctx.save();
+            
+            // Calculate smooth rotation (full 360° rotation)
+            const progress = 1 - (this.flipTimer / this.flipDuration);
+            const rotation = progress * Math.PI * 2; // 0 to 2π (360°)
+            
+            // Rotate around center of sprite
+            ctx.translate(x + this.width / 2, y + this.height / 2);
+            ctx.rotate(rotation);
+            
             ctx.drawImage(
                 this.frontflipSheet,
                 this.animationFrame * this.frontflipFrameWidth, 0, // Source X, Y
                 this.frontflipFrameWidth, this.frontflipFrameHeight, // Source width, height
-                x, y, // Destination X, Y
+                -this.width / 2, -this.height / 2, // Centered destination X, Y
                 this.width, this.height // Destination width, height
             );
+            
+            ctx.restore();
         } else if (this.animationState === 'jumping' && this.jumpLoaded) {
             // Use jump sprite when jumping
             ctx.drawImage(

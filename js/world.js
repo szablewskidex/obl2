@@ -34,11 +34,12 @@ class World {
     
     loadTextures() {
         const textureList = [
-            'nieb.png',           // Sky background
+            'skys.png',           // Sky background (new separate sky)
+            'nieb.png',           // Old sky (kept for compatibility)
             'oblockfence.png',    // Fence/wall texture
             'oblockmid.png',      // Platform texture
             'platform.png',       // Platform texture
-            'download.png',       // Background element
+            'download.png',       // Buildings without sky
             'moneta.png',         // Coin texture (renamed from oblck.png)
             'obstacle1.png',      // Tall block texture for obstacles (renamed from oblckclck.png)
             'police_car.png'      // Police car obstacle (can jump on)
@@ -126,8 +127,8 @@ class World {
         this.parallaxLayers = [
             {
                 name: 'sky',
-                texture: 'nieb',
-                speed: 0.1,
+                texture: 'skys',
+                speed: 0.05,
                 y: skyY,
                 scale: skyScale,
                 mirroring: 1863,
@@ -136,7 +137,7 @@ class World {
             {
                 name: 'red_buildings',
                 texture: 'download',
-                speed: 0.4,
+                speed: 0.25,
                 y: buildingsY,
                 scale: buildingsScale,
                 mirroring: 900,
@@ -271,11 +272,14 @@ class World {
         
         // Clouds are now handled in main.js - no longer part of world
         
-        // ✅ DEAD ZONE CAMERA SYSTEM - mniejsza martwa strefa
+        // ✅ DEAD ZONE CAMERA SYSTEM - mniejsza martwa strefa, jeszcze mniejsza podczas boost'u
         let targetDirection = 0;
         const centerX = this.width * 0.5;
         const distanceFromCenter = playerX - centerX;
-        const deadZoneWidth = this.width * 0.15; // 15% szerokości ekranu (zmniejszone z 30%)
+        let deadZoneWidth = this.width * 0.15; // 15% szerokości ekranu (zmniejszone z 30%)
+        if (playerState.shootRunBoostActive) {
+            deadZoneWidth = this.width * 0.08; // 8% podczas boost'u - lepsze centrowanie
+        }
         const deadZoneLeft = centerX - deadZoneWidth / 2;
         const deadZoneRight = centerX + deadZoneWidth / 2;
         
@@ -313,8 +317,11 @@ class World {
             }
         }
         
-        // Lerp current direction towards target (smooth transition)
-        const lerpSpeed = 10.0; // How fast to change direction (faster = more responsive)
+        // Lerp current direction towards target (smooth transition, faster during boost)
+        let lerpSpeed = 10.0; // How fast to change direction (faster = more responsive)
+        if (playerState.shootRunBoostActive) {
+            lerpSpeed = 15.0; // Faster camera response during boost
+        }
         this.currentScrollDirection += (targetDirection - this.currentScrollDirection) * lerpSpeed * deltaTime;
         
         // Track how much we scrolled for player adjustment
@@ -322,8 +329,13 @@ class World {
         
         // Only scroll if direction is significant
         if (Math.abs(this.currentScrollDirection) > 0.01) {
-            // Speed up scrolling during dash (2x faster)
-            const speedMultiplier = playerState.isDashing ? 2.0 : 1.0;
+            // Speed up scrolling during dash (2x) or boost (1.5x)
+            let speedMultiplier = 1.0;
+            if (playerState.isDashing) {
+                speedMultiplier = 2.0;
+            } else if (playerState.shootRunBoostActive) {
+                speedMultiplier = 1.5;
+            }
             const actualScrollSpeed = this.scrollSpeed * speedMultiplier;
             scrollDistance = actualScrollSpeed * deltaTime * this.currentScrollDirection;
             
@@ -485,7 +497,12 @@ class World {
         
         // Update obstacles (always, with current scroll speed)
         if (this.obstacleManager) {
-            const speedMultiplier = playerState.isDashing ? 2.0 : 1.0;
+            let speedMultiplier = 1.0;
+            if (playerState.isDashing) {
+                speedMultiplier = 2.0;
+            } else if (playerState.shootRunBoostActive) {
+                speedMultiplier = 1.5;
+            }
             const currentScrollSpeed = this.scrollSpeed * speedMultiplier;
             this.obstacleManager.update(deltaTime, currentScrollSpeed, this.currentScrollDirection, this.width);
         }

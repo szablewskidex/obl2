@@ -264,7 +264,7 @@ class WeaponSystem {
         this.maxShellCasings = 10;
     }
     
-    update(deltaTime, keys, player, screenWidth, screenHeight, aimInput = {}) {
+    update(deltaTime, keys, player, screenWidth, screenHeight, aimInput = {}, haptics = null) {
         // Store player flip state for weapon rotation
         this.playerIsFlipping = player.isFlipping;
         this.playerFlipRotation = player.flipRotation;
@@ -342,6 +342,10 @@ class WeaponSystem {
         // Handle shooting input - use the same shootKey variable from above
         if (this.isAiming && this.canShoot && !this.isReloading && this.currentAmmo > 0 && this.fireTimer <= 0) {
             this.shoot(player);
+            // Haptic feedback for shooting
+            if (haptics && haptics.shoot) {
+                haptics.shoot();
+            }
         }
         
         // Handle reload input

@@ -2,12 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-touch-fullscreen" content="yes">
     <meta name="format-detection" content="telephone=no">
     <meta name="theme-color" content="#667eea">
+    <meta name="screen-orientation" content="landscape">
+    <meta name="x5-orientation" content="landscape">
+    <meta name="x5-fullscreen" content="true">
     <title>Bungvo Enhanced - HTML5 Rewrite</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="assets/charatlas.png">
@@ -29,6 +33,9 @@
             position: fixed;
             top: 0;
             left: 0;
+            /* Prevent refresh on orientation change */
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: none;
         }
         
         #gameContainer {
@@ -582,9 +589,71 @@
             text-shadow: 0 0 5px #00ffff;
             box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
         }
+        
+        /* Portrait mode warning overlay */
+        #rotateWarning {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        #rotateWarning .rotate-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: rotate-pulse 2s ease-in-out infinite;
+        }
+        
+        #rotateWarning h2 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        #rotateWarning p {
+            font-size: 16px;
+            opacity: 0.8;
+        }
+        
+        @keyframes rotate-pulse {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(90deg) scale(1.1); }
+        }
+        
+        /* Portrait warning is controlled by JavaScript now */
+        #rotateWarning {
+            display: none; /* Hidden by default, shown by JS */
+        }
     </style>
 </head>
 <body>
+    <!-- Portrait mode warning -->
+    <div id="rotateWarning">
+        <div class="rotate-icon">📱↻</div>
+        <h2>Rotate Your Device</h2>
+        <p>This game is designed for landscape mode</p>
+        <button id="playPortraitBtn" style="
+            margin-top: 20px;
+            padding: 15px 30px;
+            font-size: 18px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+        ">Play Anyway</button>
+    </div>
+    
     <div id="gameContainer">
         <canvas id="gameCanvas"></canvas>
         
@@ -627,6 +696,7 @@
             <button class="menu-button" onclick="startGame()">Start Game</button>
             <button class="menu-button" onclick="showInstructions()">How to Play</button>
             <button class="menu-button" onclick="showSettings()">Settings</button>
+            <button class="menu-button" onclick="testVibration()" style="font-size: 14px; padding: 10px;">🔔 Test Vibration</button>
             <div style="margin-top: 30px; font-size: 18px; color: #00ffff; text-shadow: 0 0 5px #00ffff;">
                 💰 HIGH SCORE: <span id="highScore" style="color: #ff00ff; text-shadow: 0 0 5px #ff00ff; font-weight: bold;">0</span>
             </div>
@@ -671,6 +741,14 @@
                         <span style="font-size: 12px; color: #888;">Disable to improve performance</span>
                     </div>
                 </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <label>📳 Haptic Feedback (Vibration):</label>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <button id="hapticsToggle" class="menu-button" onclick="toggleHaptics()" style="padding: 8px 20px; font-size: 14px; margin: 0;">ON</button>
+                        <span style="font-size: 12px; color: #888;">Mobile vibration & gamepad rumble</span>
+                    </div>
+                </div>
             </div>
             
             <div style="margin-top: 30px; display: flex; gap: 20px;">
@@ -706,12 +784,103 @@
     <script src="js/physics.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/gamepad.js"></script>
+    <script src="js/haptics.js"></script>
     <script src="js/fullscreen.js"></script>
     <script src="js/settings.js"></script>
     <script src="js/touch.js"></script>
     <script src="js/main.js?v=5"></script>
     
     <script>
+        // ============================================
+        // Offline Protection - Block refresh when offline
+        // ============================================
+        (function() {
+            // Block F5 and Ctrl+R when offline
+            window.addEventListener('keydown', (e) => {
+                if (!navigator.onLine) {
+                    if (e.key === 'F5' || (e.ctrlKey && e.key === 'r') || (e.metaKey && e.key === 'r')) {
+                        e.preventDefault();
+                        console.warn('⚠️ Refresh blocked - offline mode');
+                        showOfflineMessage('Refresh disabled in offline mode');
+                        return false;
+                    }
+                }
+            }, true);
+            
+            // Block location.reload() when offline
+            const originalReload = window.location.reload.bind(window.location);
+            window.location.reload = function() {
+                if (!navigator.onLine) {
+                    console.warn('⚠️ location.reload() blocked - offline');
+                    showOfflineMessage('Reload blocked - offline mode');
+                    return;
+                }
+                originalReload();
+            };
+            
+            // Show offline message
+            function showOfflineMessage(text) {
+                const msg = document.createElement('div');
+                msg.textContent = '⚠️ ' + text;
+                msg.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: rgba(255, 107, 107, 0.95);
+                    color: white;
+                    padding: 15px 30px;
+                    border-radius: 8px;
+                    font-weight: bold;
+                    z-index: 10000;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                `;
+                document.body.appendChild(msg);
+                setTimeout(() => msg.remove(), 2000);
+            }
+            
+            // Show offline indicator
+            function updateOfflineIndicator() {
+                let indicator = document.getElementById('offlineIndicator');
+                if (!navigator.onLine) {
+                    if (!indicator) {
+                        indicator = document.createElement('div');
+                        indicator.id = 'offlineIndicator';
+                        indicator.textContent = '⚠️ OFFLINE';
+                        indicator.style.cssText = `
+                            position: fixed;
+                            top: 10px;
+                            right: 10px;
+                            background: rgba(255, 107, 107, 0.95);
+                            color: white;
+                            padding: 8px 15px;
+                            border-radius: 20px;
+                            font-size: 11px;
+                            font-weight: bold;
+                            z-index: 9999;
+                            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                        `;
+                        document.body.appendChild(indicator);
+                    }
+                } else {
+                    if (indicator) indicator.remove();
+                }
+            }
+            
+            window.addEventListener('online', () => {
+                console.log('✅ Back online');
+                updateOfflineIndicator();
+            });
+            
+            window.addEventListener('offline', () => {
+                console.log('⚠️ Offline mode - refresh blocked');
+                updateOfflineIndicator();
+            });
+            
+            // Check on load
+            updateOfflineIndicator();
+        })();
+        
         // Setup responsive canvas - fullscreen with proper scaling
         function setupCanvas() {
             const canvas = document.getElementById('gameCanvas');
@@ -781,13 +950,19 @@
         // Setup touch controls after page loads
         window.addEventListener('load', setupTouchControls);
         
-        // Handle orientation change on mobile
+        // Handle orientation change on mobile - WITHOUT RELOAD
+        let resizeTimer;
         window.addEventListener('resize', () => {
-            setupCanvas();
-            // Reload game with new dimensions if needed
-            if (window.game) {
-                location.reload();
-            }
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                // Only resize canvas if game is not playing
+                if (!window.game || window.game.gameState !== 'playing') {
+                    setupCanvas();
+                    console.log('Canvas resized (game not playing)');
+                } else {
+                    console.log('Rotation during game - ignoring to prevent interruption');
+                }
+            }, 300); // Debounce 300ms
         });
         
         // Initialize game
@@ -805,16 +980,40 @@
             }
         });
         
-        // Register service worker for PWA
+        // Register service worker for PWA with offline support
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js')
                     .then(registration => {
-                        console.log('ServiceWorker registered:', registration.scope);
+                        console.log('✅ ServiceWorker registered - Offline mode enabled!');
+                        
+                        // Check for updates periodically
+                        setInterval(() => {
+                            registration.update();
+                        }, 60000); // Check every minute
+                        
+                        // Handle updates
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    console.log('🔄 New version available! Refresh to update.');
+                                }
+                            });
+                        });
                     })
                     .catch(err => {
-                        console.log('ServiceWorker registration failed:', err);
+                        console.log('❌ ServiceWorker registration failed:', err);
                     });
+            });
+            
+            // Show offline/online status
+            window.addEventListener('online', () => {
+                console.log('🌐 Back online!');
+            });
+            
+            window.addEventListener('offline', () => {
+                console.log('📴 Offline mode - using cached resources');
             });
         }
     </script>

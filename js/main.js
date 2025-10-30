@@ -48,6 +48,7 @@ class BungvoGame {
         this.keys = {};
         this.gamepadManager = new GamepadManager();
         this.fullscreenManager = new FullscreenManager();
+        this.haptics = new HapticFeedback();
         this.setupInput();
         
         // Game loop
@@ -159,6 +160,32 @@ class BungvoGame {
     }
     
     update(deltaTime) {
+        // Check for Start/Menu button (button 9) - BEFORE gameState check so it works when paused
+        if (!this._lastStartCheck || Date.now() - this._lastStartCheck > 200) {
+            this._lastStartCheck = Date.now();
+            const gamepads = navigator.getGamepads();
+            for (const gamepad of gamepads) {
+                if (gamepad && gamepad.buttons[9]?.pressed) {
+                    if (!this._startButtonPressed) {
+                        this._startButtonPressed = true;
+                        
+                        if (this.gameState === 'playing') {
+                            // Pause game
+                            this.togglePause();
+                            console.log('🎮 Game paused');
+                        } else if (this.gameState === 'paused') {
+                            // Resume game
+                            this.togglePause();
+                            console.log('🎮 Game resumed');
+                        }
+                    }
+                } else if (gamepad) {
+                    this._startButtonPressed = false;
+                }
+            }
+        }
+        
+        // Don't update game logic when paused
         if (this.gameState !== 'playing') return;
         
         // Update gamepad
@@ -179,7 +206,23 @@ class BungvoGame {
         }
         
         // Update player and get walking state
+        const wasDashing = this.player.isDashing;
+        const wasOnGround = this.player.onGround;
         const playerState = this.player.update(deltaTime, combinedKeys, this.world);
+        
+        // Haptic feedback for dash start
+        if (this.haptics && this.player.isDashing && !wasDashing) {
+            this.haptics.dash();
+        }
+        
+        // Haptic feedback for landing only (not jump) with debouncing
+        if (this.haptics && this.player.onGround && !wasOnGround) {
+            const now = Date.now();
+            if (!this._lastLandTime || now - this._lastLandTime > 100) {
+                this.haptics.land();
+                this._lastLandTime = now;
+            }
+        }
         
         // Update weapon system
         if (this.weaponSystem) {
@@ -188,7 +231,7 @@ class BungvoGame {
                 mouseDeltaY: this.mouseDeltaY || 0,
                 gamepadLeftStickY: this.gamepadManager.getAxisValue(this.gamepadManager.axes.LEFT_STICK_Y) || 0
             };
-            this.weaponSystem.update(deltaTime, combinedKeys, this.player, this.canvas.width, this.canvas.height, aimInput);
+            this.weaponSystem.update(deltaTime, combinedKeys, this.player, this.canvas.width, this.canvas.height, aimInput, this.haptics);
         }
         
         // Update enemies
@@ -291,12 +334,14 @@ class BungvoGame {
                         killScore += 25; // Bonus for headshot kill
                     }
                     this.score += killScore;
+                    if (this.haptics) this.haptics.explosion(); // Haptic feedback for kill
                 } else {
                     let hitScore = 10;
                     if (hit.isHeadshot) {
                         hitScore += 5; // Bonus for headshot hit
                     }
                     this.score += hitScore;
+                    if (this.haptics) this.haptics.light(); // Light haptic for hit
                 }
                 this.updateUI();
             });
@@ -364,6 +409,7 @@ class BungvoGame {
         if (actualDamage > 0) {
             console.log(`Player hit by ${enemy.type} enemy! -${actualDamage} HP`);
             this.playerHP -= actualDamage;
+            if (this.haptics) this.haptics.hit(); // Haptic feedback for damage
             this.updateUI();
             
             // Add screen shake effect
@@ -422,6 +468,7 @@ class BungvoGame {
         if (actualDamage > 0) {
             console.log(`Player hit ${obstacle.type}! -${actualDamage} HP`);
             this.playerHP -= actualDamage;
+            if (this.haptics) this.haptics.hit(); // Haptic feedback for damage
             this.updateUI();
             
             // Add screen shake effect
@@ -1053,10 +1100,16 @@ class BungvoGame {
         document.getElementById('menu').classList.remove('hidden');
         document.getElementById('highScore').textContent = this.highScore;
         this.gameState = 'menu';
+        
+        // Start gamepad polling for menu navigation
+        startGamepadPolling();
     }
     
     hideMenu() {
         document.getElementById('menu').classList.add('hidden');
+        
+        // Stop gamepad polling when leaving menu
+        stopGamepadPolling();
     }
     
     isMobile() {
@@ -1215,6 +1268,16 @@ window.game = game; // Expose to window for canvas resize
 
 // Global functions for HTML buttons
 function startGame() {
+    // Test vibration IMMEDIATELY on click (user gesture)
+    console.log('StartGame clicked - testing vibration');
+    if ('vibrate' in navigator) {
+        console.log('Vibration API available, testing...');
+        const testResult = navigator.vibrate(50);
+        console.log('Test vibration result:', testResult);
+    } else {
+        console.log('Vibration API NOT available');
+    }
+    
     if (!game) {
         // Ensure canvas is properly sized before creating game
         const canvas = document.getElementById('gameCanvas');
@@ -1228,6 +1291,13 @@ function startGame() {
         game = new BungvoGame();
         window.game = game; // Expose to window
     }
+    
+    // Test haptics on game start (requires user gesture)
+    if (game.haptics && game.haptics.enabled) {
+        console.log('Testing game.haptics.light()');
+        game.haptics.light();
+    }
+    
     game.start();
 }
 
@@ -1297,9 +1367,149 @@ function toggleGamepad() {
     console.log(`Gamepad ${newState ? 'enabled' : 'disabled'}`);
 }
 
+// Test vibration function
+function testVibration() {
+    console.log('=== VIBRATION TEST ===');
+    console.log('Navigator.vibrate exists:', 'vibrate' in navigator);
+    console.log('User agent:', navigator.userAgent);
+    
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    console.log('Is iOS:', isIOS);
+    
+    if ('vibrate' in navigator) {
+        console.log('Attempting 200ms vibration...');
+        try {
+            const result = navigator.vibrate(200);
+            console.log('Vibration result:', result);
+            alert('Vibration test executed! Result: ' + result);
+        } catch (e) {
+            console.error('Vibration error:', e);
+            alert('Vibration failed: ' + e.message);
+        }
+    } else if (isIOS) {
+        // iOS fallback
+        console.log('Using iOS haptic fallback');
+        try {
+            let el = document.createElement('div');
+            let id = 'haptic_test_' + Math.random().toString(36).slice(2);
+            el.innerHTML = `<input type="checkbox" id="${id}" switch /><label for="${id}"></label>`;
+            el.setAttribute("style", "display:none !important;opacity:0 !important;visibility:hidden !important;");
+            document.querySelector('body').appendChild(el);
+            el.querySelector('label').click();
+            setTimeout(() => { 
+                if (el.parentNode) el.remove(); 
+            }, 100);
+            alert('iOS haptic feedback triggered! Did you feel it?');
+        } catch (e) {
+            console.error('iOS haptic failed:', e);
+            alert('iOS haptic failed: ' + e.message);
+        }
+    } else {
+        alert('Vibration API not supported on this device/browser');
+    }
+}
+
+// ✅ Haptics toggle function
+function toggleHaptics() {
+    const hapticsEnabled = localStorage.getItem('hapticsEnabled') !== 'false';
+    const newState = !hapticsEnabled;
+    
+    localStorage.setItem('hapticsEnabled', newState);
+    
+    const button = document.getElementById('hapticsToggle');
+    if (button) {
+        button.textContent = newState ? 'ON' : 'OFF';
+        button.style.color = newState ? '#00ffff' : '#ff0066';
+    }
+    
+    // Update game if running
+    if (window.game && window.game.haptics) {
+        window.game.haptics.setEnabled(newState);
+        // Test vibration when enabling
+        if (newState) {
+            window.game.haptics.medium();
+        }
+    }
+    
+    console.log(`Haptics ${newState ? 'enabled' : 'disabled'}`);
+}
+
 // Initialize game when page loads
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Bungvo Enhanced loaded!');
+    
+    // Lock screen orientation to landscape on mobile
+    if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').then(() => {
+            console.log('✅ Screen locked to landscape');
+        }).catch(err => {
+            console.log('⚠️ Screen orientation lock not supported or failed:', err);
+        });
+    }
+    
+    // Handle "Play Anyway" button in portrait mode
+    const playPortraitBtn = document.getElementById('playPortraitBtn');
+    const rotateWarning = document.getElementById('rotateWarning');
+    
+    if (playPortraitBtn) {
+        playPortraitBtn.addEventListener('click', () => {
+            console.log('📱 User chose to play in portrait mode');
+            rotateWarning.style.display = 'none';
+            localStorage.setItem('allowPortrait', 'true');
+        });
+    }
+    
+    // Check if user allowed portrait mode
+    const allowPortrait = localStorage.getItem('allowPortrait') === 'true';
+    
+    // Handle orientation changes
+    let orientationTimeout;
+    const handleOrientationChange = (e) => {
+        // Debounce to prevent multiple calls
+        clearTimeout(orientationTimeout);
+        orientationTimeout = setTimeout(() => {
+            const isPortrait = window.matchMedia('(orientation: portrait)').matches;
+            const isMobile = window.matchMedia('(max-width: 768px)').matches;
+            
+            if (isMobile && isPortrait && !allowPortrait) {
+                // Show warning overlay
+                if (rotateWarning) {
+                    rotateWarning.style.display = 'flex';
+                }
+            } else {
+                // Hide warning overlay
+                if (rotateWarning) {
+                    rotateWarning.style.display = 'none';
+                }
+            }
+        }, 100);
+    };
+    
+    // Check orientation on load
+    handleOrientationChange();
+    
+    // Listen for orientation changes with passive listeners (don't block)
+    window.addEventListener('orientationchange', handleOrientationChange, { passive: true });
+    
+    // Don't listen to resize - it's too aggressive
+    // window.addEventListener('resize', handleOrientationChange);
+    
+    // Prevent zoom gestures only (not orientation change)
+    document.addEventListener('gesturestart', (e) => {
+        e.preventDefault();
+    }, { passive: false });
+    
+    // Initialize haptics toggle button state
+    const hapticsEnabled = localStorage.getItem('hapticsEnabled') !== 'false';
+    const hapticsButton = document.getElementById('hapticsToggle');
+    if (hapticsButton) {
+        hapticsButton.textContent = hapticsEnabled ? 'ON' : 'OFF';
+        hapticsButton.style.color = hapticsEnabled ? '#00ffff' : '#ff0066';
+    }
+    
+    // Start gamepad polling for menu navigation
+    startGamepadPolling();
+    console.log('🎮 Gamepad menu navigation enabled');
 });
 
 
@@ -1381,7 +1591,7 @@ function handleMenuGamepad() {
 let gamepadInterval = null;
 function startGamepadPolling() {
     if (!gamepadInterval) {
-        gamepadInterval = setInterval(handleMenuGamepad, 200); // Slower polling
+        gamepadInterval = setInterval(handleMenuGamepad, 100); // 10 times per second
     }
 }
 function stopGamepadPolling() {
